@@ -45,7 +45,32 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User reopening an analysed job, including after a refresh, sees the previous analysis instantly with no new AI call; the pasted resume also survives a refresh
   5. User is told plainly that our server reads the resume without storing or logging it and that Google processes it; the AI key never appears in the browser; a failed or unconfigured AI call shows one clear, retryable message
 
-**Plans**: TBD
+**Plans:** 11 plans
+
+Plans:
+**Wave 1**
+- [ ] 01-01-PLAN.md — Workspace package, pinned Gemini SDK (after a blocking registry check) and the approved configuration changes
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 01-02-PLAN.md — Tracer, server half: wire contracts, AI client over generateContent, POST /api/fit, stand-in model
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 01-03-PLAN.md — Tracer, browser half: stub page, stored analysis, refresh without a new AI request, Playwright harness
+- [ ] 01-04-PLAN.md — Contact details and links removed in shared code and enforced on the server before any model call
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 01-05-PLAN.md — Nine hand-written seed jobs, the synthetic demo resume, job list and job detail page
+- [ ] 01-06-PLAN.md — Server guards: metadata-only logs, origin check, hand-written rate limiter
+- [ ] 01-07-PLAN.md — Evidence-checked ratings: quote verification, id reconciliation, supported-keyword schema
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 01-08-PLAN.md — Paste form with contact removal shown to the user, persisted resume, greeting feature retired
+- [ ] 01-09-PLAN.md — Live-call spike against the real model (paid, not a gate) and model settings from the measurements
+
+**Wave 6** *(blocked on Wave 5 completion)*
+- [ ] 01-10-PLAN.md — Score and band computed in code, result panel, running and failed states
+- [ ] 01-11-PLAN.md — Privacy note with the billing decision, AI status notice, env template, no-key-in-browser test
+
 **UI hint**: yes
 
 ### Phase 01.1: Gaps, learning plan, tips and failure handling (INSERTED)
