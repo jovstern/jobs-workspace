@@ -62,6 +62,14 @@ Requirements: RES-01..06, FIT-01..08, FIT-10, FIT-11, DATA-01, DATA-02, DATA-06,
   (scanned or image-based PDF), the **PDF itself is sent to Gemini**, and its transcription
   goes into the same step-1 review. The user is told this happened. Protected or oversized
   files still get a clear message with the paste-instead option (RES-06).
+- **D-09a (Claude's reconciliation of D-07 and D-09, to be confirmed by the user at plan
+  approval):** D-07 promises contact details are removed before anything goes to Gemini, but a
+  PDF sent to Gemini under D-09 necessarily contains them. To honour both, the fallback is
+  **consent-first**: when local extraction fails, nothing is sent yet. The user is told the file
+  could not be read and is offered two choices: let Google's AI read the whole file (stated
+  plainly: it will see everything in it, including contact details), or paste the text instead.
+  The PDF is sent only after the user chooses the first. The transcription that comes back is
+  stripped of contact details like any other resume text before it is stored or reused.
 
 ### Fit score
 - **D-10:** **Required requirements dominate** the score: met is full credit, partial is half.
