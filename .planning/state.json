@@ -1,0 +1,48 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": null,
+  "phases": [
+    {
+      "number": "1",
+      "name": "Real AI path, end to end",
+      "status": "pending"
+    },
+    {
+      "number": "2",
+      "name": "Workspace, search and design system",
+      "status": "pending"
+    },
+    {
+      "number": "3",
+      "name": "Applications core",
+      "status": "pending"
+    },
+    {
+      "number": "4",
+      "name": "Stage editing and close-out",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "Pipeline strip and nudges",
+      "status": "pending"
+    },
+    {
+      "number": "6",
+      "name": "Ask about this job",
+      "status": "pending"
+    },
+    {
+      "number": "7",
+      "name": "Your data: export, import, erase",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 1)",
+    "reason": "Phase 1 of 7 — needs a plan"
+  },
+  "updated_at": "2026-10-10T18:19:56.737Z"
+}

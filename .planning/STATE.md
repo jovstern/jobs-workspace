@@ -66,6 +66,8 @@ Recent decisions affecting current work:
 - [Roadmap]: AI results in persisted Zustand stores; chat streams inside a TanStack Query mutation; TanStack Router for URL state; applications store job id only
 - [Roadmap]: Stage reorder by Move up / Move down only in v1; export/import/erase is the final phase with its own demo
 
+- [Roadmap] 2026-10-10: Phase 1 split into Phases 1, 01.1 and 01.2 (user decision at planning; the original 20-requirement phase was too large to plan at full quality). Phase 1's CONTEXT, RESEARCH, UI-SPEC, PATTERNS and VALIDATION files cover the union of the three; Phases 01.1 and 01.2 reuse them.
+
 ### Pending Todos
 
 None yet.

@@ -209,30 +209,30 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | PIPE-06 | Phase 5 | Pending |
 | PIPE-07 | Phase 5 | Pending |
 | PIPE-08 | Phase 5 | Pending |
-| RES-01 | Phase 1 | Pending |
+| RES-01 | Phase 01.2 | Pending |
 | RES-02 | Phase 1 | Pending |
-| RES-03 | Phase 1 | Pending |
-| RES-04 | Phase 1 | Pending |
-| RES-05 | Phase 1 | Pending |
-| RES-06 | Phase 1 | Pending |
+| RES-03 | Phase 01.2 | Pending |
+| RES-04 | Phase 01.2 | Pending |
+| RES-05 | Phase 01.2 | Pending |
+| RES-06 | Phase 01.2 | Pending |
 | FIT-01 | Phase 1 | Pending |
 | FIT-02 | Phase 1 | Pending |
 | FIT-03 | Phase 1 | Pending |
-| FIT-04 | Phase 1 | Pending |
-| FIT-05 | Phase 1 | Pending |
-| FIT-06 | Phase 1 | Pending |
-| FIT-07 | Phase 1 | Pending |
+| FIT-04 | Phase 01.1 | Pending |
+| FIT-05 | Phase 01.2 | Pending |
+| FIT-06 | Phase 01.1 | Pending |
+| FIT-07 | Phase 01.1 | Pending |
 | FIT-08 | Phase 1 | Pending |
 | FIT-09 | Phase 2 | Pending |
-| FIT-10 | Phase 1 | Pending |
-| FIT-11 | Phase 1 | Pending |
+| FIT-10 | Phase 01.2 | Pending |
+| FIT-11 | Phase 01.1 | Pending |
 | CHAT-01 | Phase 6 | Pending |
 | CHAT-02 | Phase 6 | Pending |
 | CHAT-03 | Phase 6 | Pending |
 | CHAT-04 | Phase 6 | Pending |
 | CHAT-05 | Phase 6 | Pending |
 | DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
+| DATA-02 | Phase 01.1 | Pending |
 | DATA-03 | Phase 7 | Pending |
 | DATA-04 | Phase 7 | Pending |
 | DATA-05 | Phase 7 | Pending |
@@ -244,7 +244,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 - Mapped to phases: 72
 - Unmapped: 0 ✓
 
-**Per phase:** Phase 1: 20, Phase 2: 15, Phase 3: 13, Phase 4: 7, Phase 5: 9, Phase 6: 5, Phase 7: 3
+**Per phase:** Phase 1: 8, Phase 01.1: 5, Phase 01.2: 7, Phase 2: 15, Phase 3: 13, Phase 4: 7, Phase 5: 9, Phase 6: 5, Phase 7: 3
 
 ---
 *Requirements defined: 2026-10-10*

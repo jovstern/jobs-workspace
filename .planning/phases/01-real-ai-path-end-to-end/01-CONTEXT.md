@@ -16,9 +16,40 @@ Styling is plain in this phase. The three-pane workspace, search, the LinkedIn-l
 the design system are Phase 2. Tracking, stages, nudges, chat and export/import are later
 phases. A stub page with a job picker is enough to host the resume flow and the fit panel.
 
-Requirements: RES-01..06, FIT-01..08, FIT-10, FIT-11, DATA-01, DATA-02, DATA-06, DATA-07.
+Requirements of the original, unsplit phase: RES-01..06, FIT-01..08, FIT-10, FIT-11, DATA-01, DATA-02, DATA-06, DATA-07. See "Scope After the Split" below for what Phase 1 itself now covers.
 
 </domain>
+
+<scope_after_split>
+## Scope After the Split (2026-10-10, user decision)
+
+Planning showed the original Phase 1 (20 requirements) was too large to plan at full quality.
+The user chose to split it into three phases. **This file, `01-RESEARCH.md`, `01-UI-SPEC.md`,
+`01-PATTERNS.md` and `01-VALIDATION.md` describe the union of all three**; the roadmap is the
+authority on which part belongs to which phase.
+
+| Phase | Delivers | Requirements | Decisions that land here |
+|-------|----------|--------------|--------------------------|
+| **1** (this phase) | Rated fit check on pasted text | RES-02, FIT-01, FIT-02, FIT-03, FIT-08, DATA-01, DATA-06, DATA-07 | D-01 to D-04, D-07, D-10, D-11, D-14, D-15, D-16, D-18, D-19 |
+| **01.1** | Gaps, learning plan, tips, failure handling, storage safety | FIT-04, FIT-06, FIT-07, FIT-11, DATA-02 | D-02 (rate-limit and quota messages), wording rules |
+| **01.2** | PDF upload, two-step review, resume lifecycle | RES-01, RES-03, RES-04, RES-05, RES-06, FIT-05, FIT-10 | D-05, D-06, D-08, D-09, D-09a, D-12, D-13, D-17 |
+
+**What Phase 1 is and is not:**
+- In: paste a resume (contact details and links removed, user told), pick one of 8-10 seed jobs,
+  "Check my fit" through the real SDK path, per-requirement ratings with verified quotes, score
+  and band computed in code, results and resume persisted in the browser, the privacy note, the
+  server guards (key custody, origin check, rate limiter, metadata-only logging), a typed error
+  envelope with one generic retryable message and the "AI not configured" notice.
+- Not in Phase 1: PDF upload and the unreadable-PDF fallback, the structured profile and its
+  review step, "I do have this", replace/delete and the stale marker (all 01.2); gaps list,
+  learning plan, tailoring tips, the full per-error message table and progress stages, and the
+  migration / corrupt-data set-aside behaviour (all 01.1).
+- Shapes Phase 1 must reserve so later phases need no storage migration: the stored resume record
+  carries `profile: null` and the stored analysis carries `advice: null` from version 1.
+- The first model call in Phase 1 returns ratings only; the advice half (learning plan, tips)
+  arrives in 01.1.
+
+</scope_after_split>
 
 <decisions>
 ## Implementation Decisions
