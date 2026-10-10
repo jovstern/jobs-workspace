@@ -85,8 +85,8 @@ same page, without ever losing their search context.
   `server/`) — decided before kickoff; not open for alternatives
 - **Backend**: Stateless Express server — serves seeded jobs and proxies AI calls; holds no user data
 - **Persistence**: Browser storage only — user chose no server-side user data for the first version
-- **AI**: Claude via the Anthropic API, called only from the server — the API key must never
-  reach the browser; supplied by the user in a local `.env`
+- **AI**: Google Gemini via the Gemini API, called only from the server — the API key
+  (`GEMINI_API_KEY`) must never reach the browser; supplied by the user in `server/.env`
 - **Privacy**: The resume is sent to the server only as part of an AI request and is not stored there
 - **Process**: Every phase must end in something visibly working that a short GIF can show;
   the riskiest unknown is proven first
@@ -111,6 +111,7 @@ same page, without ever losing their search context.
 | Add TanStack Router for URL state | User chose a router library over a hand-written helper; an approved addition to the fixed stack | — Pending |
 | Applications store the job id only, no job snapshot | Keeps server data out of stores; seeded ids are fixed and tested; missing job renders "listing unavailable" | — Pending |
 | Stage reorder by Move up / Move down in v1; drag and drop deferred | Buttons are required for accessibility anyway; drag library is unproven with the React Compiler | — Pending |
+| Gemini instead of Claude as the AI provider | User supplied a Gemini API key at the start of Phase 1; the product design (per-requirement ratings, code-computed score) is provider-independent. Project research on the Claude SDK, models and API limits in `.planning/research/` is superseded and must be redone for Gemini in Phase 1 research | — Pending |
 | Export, import and erase-all in v1 | Browser-only data is lost when site data is cleared (Safari clears after 7 idle days) | — Pending |
 
 ## Evolution
@@ -131,4 +132,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-10 after initialization*
+*Last updated: 2026-10-10 after switching the AI provider to Gemini (start of Phase 1)*

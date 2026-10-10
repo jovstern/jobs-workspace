@@ -65,9 +65,10 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1] Spike first: one real call with `effort` and `format` in one `output_config` on Sonnet 5.5 and Haiku 5.5; measure fit latency (target under about 15 s) and decide one call vs split
-- [Phase 1] Haiku 5.5 for resume parsing is 3 days old; keep the model id in config with a Sonnet 5.5 fallback
-- [Phase 1] Build a 5-8 file synthetic resume corpus before deciding whether the PDF `document`-block fallback is needed; decide whether job `requirements[]` is authored in the seed (the code-computed score depends on it being stable)
+- [Phase 1] AI provider is Gemini (user decision, 2026-10-10; key is `GEMINI_API_KEY` in `server/.env`). The Claude-specific findings in `.planning/research/` (SDK, model ids, API parameter limits, PDF document block, prompt caching) no longer apply; Phase 1 research must cover the Gemini SDK, schema-constrained output with Zod, PDF input, streaming and model choice
+- [Phase 1] Spike first: one real schema-constrained Gemini call; measure fit latency (target under about 15 s) and decide one call vs split
+- [Phase 1] Keep model ids in one server config module; choose a fast model for resume parsing and a stronger one for fit analysis after the spike
+- [Phase 1] Build a 5-8 file synthetic resume corpus before deciding whether the send-the-PDF-to-the-model fallback is needed; decide whether job `requirements[]` is authored in the seed (the code-computed score depends on it being stable)
 - [Phase 1] Confirm `shared/` as an npm workspace package (single Zod copy) and TypeScript 7.0.2 tooling compatibility at scaffold time
 - [Phase 2] Check the LinkedIn-like palette against the live jobs page; only `#0A66C2` and `#004182` are corroborated
 - [Phase 4] Optional spike: `@dnd-kit/react` under the React Compiler (drag is deferred in v1, buttons ship regardless)
