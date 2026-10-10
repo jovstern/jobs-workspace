@@ -96,6 +96,22 @@ Requirements: RES-01..06, FIT-01..08, FIT-10, FIT-11, DATA-01, DATA-02, DATA-06,
   — **Reversibility:** costly — cached analyses and (from Phase 3) tracked applications are
   keyed by job id and by requirement
 
+### Decided after research (user, 2026-10-10)
+- **D-16:** Shared client/server schemas live in an **npm workspace package**
+  `@jobs-workspace/shared` (root `workspaces: ["server", "shared"]`). The user approved the
+  configuration changes this needs: `server/package-lock.json` is removed in favour of the single
+  root lockfile, the CI cache path and the second `npm ci` are adjusted, `shared` is added to the
+  root TypeScript `include` and the Vitest `include`, and the `server/` line in the root
+  `CLAUDE.md` is updated. See `01-RESEARCH.md` Part E for the exact file table.
+  — **Reversibility:** costly — every import of the shared package and the install layout
+- **D-17:** PDF text extraction stays **on the server** (in memory, nothing stored or logged).
+  DATA-06 was reworded to say so: the resume is sent to the server only to read it and to run AI
+  requests. The privacy note in the UI must say the same thing in plain words.
+- **D-18:** Contact removal (D-07) also removes **profile and personal links** (LinkedIn, GitHub,
+  personal sites, any URL). The person's name stays.
+- **D-19:** AI routes get a **small hand-written rate limiter** on the server (no new
+  dependency). Do not add `express-rate-limit`.
+
 ### Carried forward (already decided, do not re-ask)
 - Each requirement is rated met / partial / not evidenced, with a supporting resume quote for
   met and partial; quotes are verified against the resume text.
@@ -117,9 +133,6 @@ Requirements: RES-01..06, FIT-01..08, FIT-10, FIT-11, DATA-01, DATA-02, DATA-06,
   about 15 seconds).
 - The plain layout of the stub page, the review dialog and the fit panel.
 - How the two review steps are presented (dialog steps, tabs or a page).
-- Whether the shared client/server schemas live in a workspace package. Not signed off by the
-  user; the researchers recommended it. Choose in planning and state the choice in the plan
-  summary so the user sees it before approving.
 
 </decisions>
 

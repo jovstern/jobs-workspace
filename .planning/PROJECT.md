@@ -87,7 +87,7 @@ same page, without ever losing their search context.
 - **Persistence**: Browser storage only — user chose no server-side user data for the first version
 - **AI**: Google Gemini via the Gemini API, called only from the server — the API key
   (`GEMINI_API_KEY`) must never reach the browser; supplied by the user in `server/.env`
-- **Privacy**: The resume is sent to the server only as part of an AI request and is not stored there
+- **Privacy**: The resume is sent to the server only to read its text and to run AI requests, and is never stored or logged there
 - **Process**: Every phase must end in something visibly working that a short GIF can show;
   the riskiest unknown is proven first
 
