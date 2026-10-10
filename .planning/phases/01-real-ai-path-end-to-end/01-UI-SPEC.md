@@ -1,7 +1,7 @@
 ---
 phase: "1"
 slug: real-ai-path-end-to-end
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: "2026-10-10"
@@ -111,7 +111,7 @@ Neutral Tailwind v4 default palette only. No custom hex values and no `@theme` c
 Accent reserved for (explicit list):
 
 1. The filled primary button (`blue-700` background, white text 6.8:1; hover `blue-800` 8.8:1). At most one primary button is visible per surface (page: "Check my fit"; each dialog view: its single forward action).
-2. The keyboard focus outline on every interactive element (`outline-blue-700`, 2px, offset 2px).
+2. The keyboard focus outline on every interactive element (`outline-blue-700`, 2px, offset 2px), except the destructive button, whose outline is `outline-red-700`.
 3. The selected job in the job list (left border 4px `blue-700` plus `blue-50` background, text stays `gray-900`; 16.3:1).
 4. The active tab indicator in the intake tabs (bottom border 2px `blue-700`).
 5. Text links and text-style buttons such as "Remove confirmation" (`blue-700`, underlined; 6.8:1 on white).
@@ -215,7 +215,7 @@ Voice: plain English, sentence case, second person, no exclamation marks, no emo
 | Placeholder note | Removed details appear as [email removed], [phone removed], [address removed] and [link removed]. |
 | Source note (PDF read on the server) | `Read from {file name} by this app's server. Check columns, dates and bullet points.` |
 | Source note (PDF read by Google) | Read from your PDF by Google's AI. The whole file was sent, including contact details. They have been removed from the text below. |
-| Step 1 actions | first time: **Build my profile** / later: **Next: your profile**; secondary **Back** (first time) or **Cancel** (review) |
+| Step 1 actions | first time: **Build my profile** / later: **Next: your profile**; secondary **Back** (first time) or **Close without changes** (review; asks "Discard this resume draft?" when the text was edited) |
 | Step 2 heading | Step 2 of 2: Check your profile |
 | Step 2 help | The AI built this from your text. Edit anything that is wrong. Skills you add count as confirmed by you. |
 | Profile field labels | Headline / Years of experience / Skills / Roles |
@@ -513,12 +513,12 @@ No component library, icon package or webfont is added in this phase. Radix is a
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
-- [ ] Dimension 7 Inventory Provenance: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
+- [x] Dimension 7 Inventory Provenance: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-10-10 (dimensions 2-7 passed by gsd-ui-checker; dimension 1 passed after its single blocking label, "Cancel" in Step 1 actions, was replaced by the orchestrator)
