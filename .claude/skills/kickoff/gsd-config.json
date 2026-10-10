@@ -1,0 +1,42 @@
+{
+  "mode": "interactive",
+  "model_profile": "balanced",
+  "gates": {
+    "execute_next_plan": true,
+    "confirm_transition": true,
+    "confirm_milestone_scope": true
+  },
+  "git": {
+    "branching_strategy": "phase",
+    "create_tag": true,
+    "base_branch": "main"
+  },
+  "workflow": {
+    "research": true,
+    "plan_check": true,
+    "verifier": true,
+    "code_review": true,
+    "ui_phase": true,
+    "auto_advance": false
+  },
+  "hooks": {
+    "workflow_guard": true
+  },
+  "agent_skills": {
+    "gsd-planner": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
+    "gsd-plan-checker": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
+    "gsd-executor": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
+    "gsd-code-reviewer": [".claude/skills/stack-conventions"],
+    "gsd-code-fixer": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
+    "gsd-verifier": [".claude/skills/quality-gates"]
+  },
+  "ship": {
+    "pr_body_sections": [
+      {
+        "heading": "Demo",
+        "enabled": true,
+        "template": "![Phase {padded_phase} demo](https://github.com/__REPO__/blob/pr-media/phase-{padded_phase}/demo.gif?raw=true)"
+      }
+    ]
+  }
+}
