@@ -105,6 +105,13 @@ same page, without ever losing their search context.
 | Resume via PDF upload or pasted text | Lowest friction for the user | — Pending |
 | Single user, data in the browser | No auth phase before the page is visible | — Pending |
 | Desktop and tablet first | Three-pane layout is the core; mobile is its own design problem | — Pending |
+| Fit score computed in code from per-requirement ratings with resume quotes | A model-made number is unstable and can be manipulated by text in a job post | — Pending |
+| AI results (fit analyses, parsed resume, chat history) live in persisted Zustand stores | User sign-off on the "never copy server data into Zustand" rule: these are the user's own paid, non-refetchable records | — Pending |
+| Chat streams inside a TanStack Query mutation | User sign-off on the "every fetch through TanStack Query" rule; stable APIs, no accidental repeat of a paid call | — Pending |
+| Add TanStack Router for URL state | User chose a router library over a hand-written helper; an approved addition to the fixed stack | — Pending |
+| Applications store the job id only, no job snapshot | Keeps server data out of stores; seeded ids are fixed and tested; missing job renders "listing unavailable" | — Pending |
+| Stage reorder by Move up / Move down in v1; drag and drop deferred | Buttons are required for accessibility anyway; drag library is unproven with the React Compiler | — Pending |
+| Export, import and erase-all in v1 | Browser-only data is lost when site data is cleared (Safari clears after 7 idle days) | — Pending |
 
 ## Evolution
 
