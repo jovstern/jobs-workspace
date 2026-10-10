@@ -166,12 +166,86 @@ Which phases cover which requirements. Filled in during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| WORK-01 | Phase 2 | Pending |
+| WORK-02 | Phase 2 | Pending |
+| WORK-03 | Phase 2 | Pending |
+| WORK-04 | Phase 2 | Pending |
+| WORK-05 | Phase 3 | Pending |
+| WORK-06 | Phase 2 | Pending |
+| SRCH-01 | Phase 2 | Pending |
+| SRCH-02 | Phase 2 | Pending |
+| SRCH-03 | Phase 2 | Pending |
+| SRCH-04 | Phase 2 | Pending |
+| SRCH-05 | Phase 2 | Pending |
+| SRCH-06 | Phase 5 | Pending |
+| SRCH-07 | Phase 2 | Pending |
+| SRCH-08 | Phase 2 | Pending |
+| SRCH-09 | Phase 2 | Pending |
+| JOB-01 | Phase 2 | Pending |
+| JOB-02 | Phase 3 | Pending |
+| JOB-03 | Phase 3 | Pending |
+| TRK-01 | Phase 3 | Pending |
+| TRK-02 | Phase 3 | Pending |
+| TRK-03 | Phase 3 | Pending |
+| TRK-04 | Phase 3 | Pending |
+| TRK-05 | Phase 3 | Pending |
+| TRK-06 | Phase 3 | Pending |
+| TRK-07 | Phase 3 | Pending |
+| TRK-08 | Phase 4 | Pending |
+| TRK-09 | Phase 3 | Pending |
+| TRK-10 | Phase 4 | Pending |
+| TRK-11 | Phase 4 | Pending |
+| TRK-12 | Phase 4 | Pending |
+| STG-01 | Phase 3 | Pending |
+| STG-02 | Phase 3 | Pending |
+| STG-03 | Phase 4 | Pending |
+| STG-04 | Phase 4 | Pending |
+| STG-05 | Phase 4 | Pending |
+| PIPE-01 | Phase 5 | Pending |
+| PIPE-02 | Phase 5 | Pending |
+| PIPE-03 | Phase 5 | Pending |
+| PIPE-04 | Phase 5 | Pending |
+| PIPE-05 | Phase 5 | Pending |
+| PIPE-06 | Phase 5 | Pending |
+| PIPE-07 | Phase 5 | Pending |
+| PIPE-08 | Phase 5 | Pending |
+| RES-01 | Phase 1 | Pending |
+| RES-02 | Phase 1 | Pending |
+| RES-03 | Phase 1 | Pending |
+| RES-04 | Phase 1 | Pending |
+| RES-05 | Phase 1 | Pending |
+| RES-06 | Phase 1 | Pending |
+| FIT-01 | Phase 1 | Pending |
+| FIT-02 | Phase 1 | Pending |
+| FIT-03 | Phase 1 | Pending |
+| FIT-04 | Phase 1 | Pending |
+| FIT-05 | Phase 1 | Pending |
+| FIT-06 | Phase 1 | Pending |
+| FIT-07 | Phase 1 | Pending |
+| FIT-08 | Phase 1 | Pending |
+| FIT-09 | Phase 2 | Pending |
+| FIT-10 | Phase 1 | Pending |
+| FIT-11 | Phase 1 | Pending |
+| CHAT-01 | Phase 6 | Pending |
+| CHAT-02 | Phase 6 | Pending |
+| CHAT-03 | Phase 6 | Pending |
+| CHAT-04 | Phase 6 | Pending |
+| CHAT-05 | Phase 6 | Pending |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 1 | Pending |
+| DATA-03 | Phase 7 | Pending |
+| DATA-04 | Phase 7 | Pending |
+| DATA-05 | Phase 7 | Pending |
+| DATA-06 | Phase 1 | Pending |
+| DATA-07 | Phase 1 | Pending |
 
 **Coverage:**
 - v1 requirements: 72 total
-- Mapped to phases: 0
-- Unmapped: 72 ⚠️
+- Mapped to phases: 72
+- Unmapped: 0 ✓
+
+**Per phase:** Phase 1: 20, Phase 2: 15, Phase 3: 13, Phase 4: 7, Phase 5: 9, Phase 6: 5, Phase 7: 3
 
 ---
 *Requirements defined: 2026-10-10*
-*Last updated: 2026-10-10 after initial definition*
+*Last updated: 2026-10-10 after roadmap creation (traceability filled)*

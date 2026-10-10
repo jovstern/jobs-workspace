@@ -1,0 +1,88 @@
+---
+gsd_state_version: '1.0'
+status: planning
+progress:
+  total_phases: 7
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+---
+
+# Project State
+
+## Project Reference
+
+See: .planning/PROJECT.md (updated 2026-10-10)
+
+**Core value:** The user can search for jobs and see and update the progress of every application on the same page, without ever losing their search context.
+**Current focus:** Phase 1 - Real AI path, end to end
+
+## Current Position
+
+Phase: 1 of 7 (Real AI path, end to end)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-10-10 - Roadmap created (7 phases, 72/72 v1 requirements mapped)
+
+Progress: [░░░░░░░░░░] 0%
+
+## Performance Metrics
+
+**Velocity:**
+- Total plans completed: 0
+- Average duration: - min
+- Total execution time: 0.0 hours
+
+**By Phase:**
+
+| Phase | Plans | Total | Avg/Plan |
+|-------|-------|-------|----------|
+| - | - | - | - |
+
+**Recent Trend:**
+- Last 5 plans: none yet
+- Trend: -
+
+*Updated after each plan completion*
+
+## Accumulated Context
+
+### Decisions
+
+Decisions are logged in PROJECT.md Key Decisions table.
+Recent decisions affecting current work:
+
+- [Roadmap]: Every phase ends in a browser-visible demo; no scaffolding phase (starter template and empty `server/` are built before Phase 1)
+- [Roadmap]: Riskiest unknown first: real AI path (resume to profile to fit) is Phase 1 on hand-written seed jobs with a plain UI; design system lands in Phase 2
+- [Roadmap]: Fit score is computed in code from per-requirement ratings with resume quotes, never a model-made number
+- [Roadmap]: AI results in persisted Zustand stores; chat streams inside a TanStack Query mutation; TanStack Router for URL state; applications store job id only
+- [Roadmap]: Stage reorder by Move up / Move down only in v1; export/import/erase is the final phase with its own demo
+
+### Pending Todos
+
+None yet.
+
+### Blockers/Concerns
+
+- [Phase 1] Spike first: one real call with `effort` and `format` in one `output_config` on Sonnet 5.5 and Haiku 5.5; measure fit latency (target under about 15 s) and decide one call vs split
+- [Phase 1] Haiku 5.5 for resume parsing is 3 days old; keep the model id in config with a Sonnet 5.5 fallback
+- [Phase 1] Build a 5-8 file synthetic resume corpus before deciding whether the PDF `document`-block fallback is needed; decide whether job `requirements[]` is authored in the seed (the code-computed score depends on it being stable)
+- [Phase 1] Confirm `shared/` as an npm workspace package (single Zod copy) and TypeScript 7.0.2 tooling compatibility at scaffold time
+- [Phase 2] Check the LinkedIn-like palette against the live jobs page; only `#0A66C2` and `#004182` are corroborated
+- [Phase 4] Optional spike: `@dnd-kit/react` under the React Compiler (drag is deferred in v1, buttons ship regardless)
+- [Phase 6] Spike streaming through the Vite dev proxy: no buffering, abort on unmount, wrong-thread safety
+
+## Deferred Items
+
+Items acknowledged and deferred at milestone close, most recent first:
+
+| Category | Item | Status | Deferred At | Milestone |
+|----------|------|--------|-------------|-----------|
+| *(none)* | | | | |
+
+## Session Continuity
+
+Last session: 2026-10-10
+Stopped at: Roadmap and state created; ready for /gsd-plan-phase 1
+Resume file: None
