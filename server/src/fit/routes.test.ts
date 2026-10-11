@@ -147,6 +147,7 @@ describe('requests that must never reach the model', () => {
     expect(fake.requestCount()).toBe(0)
   })
 
+  // The origin guard refuses a non-JSON POST before the route sees it.
   test('a body that is not JSON', async () => {
     const response = await fetch(`${baseUrl}/api/fit`, {
       method: 'POST',
@@ -154,7 +155,7 @@ describe('requests that must never reach the model', () => {
       body: 'hello',
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(415)
     expect(fake.requestCount()).toBe(0)
   })
 })

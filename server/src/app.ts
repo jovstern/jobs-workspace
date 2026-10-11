@@ -14,6 +14,8 @@ export interface AppDeps {
   env: Env
   now: () => number
   log: (line: string) => void
+  // Mounted on the paid fit route only when given; the running server always passes it.
+  rateLimit: { windowMs: number; max: number }
 }
 
 // `env` is accepted now and consumed by a later task (origin checks).
