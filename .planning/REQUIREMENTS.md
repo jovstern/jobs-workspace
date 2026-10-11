@@ -71,7 +71,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 ### Resume
 
 - [ ] **RES-01**: User can provide a resume by uploading a PDF
-- [ ] **RES-02**: User can provide a resume by pasting text
+- [x] **RES-02**: User can provide a resume by pasting text
 - [ ] **RES-03**: User can review and edit the extracted resume content and the structured profile (skills, roles, experience) before it is used
 - [ ] **RES-04**: User can replace or delete their resume at any time
 - [ ] **RES-05**: User is asked for a resume at the moment they first need it (checking fit or chatting), not as a wall before using the page
@@ -79,14 +79,14 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 
 ### Fit Analysis
 
-- [ ] **FIT-01**: User can run "Check my fit" on the open job and get an analysis from a real AI model comparing the job with their resume
-- [ ] **FIT-02**: User sees each job requirement rated met, partial or not evidenced, with the supporting quote from their resume for met and partial ratings
-- [ ] **FIT-03**: User sees an overall fit score and band computed from those ratings, labelled as an estimate
+- [x] **FIT-01**: User can run "Check my fit" on the open job and get an analysis from a real AI model comparing the job with their resume
+- [x] **FIT-02**: User sees each job requirement rated met, partial or not evidenced, with the supporting quote from their resume for met and partial ratings
+- [x] **FIT-03**: User sees an overall fit score and band computed from those ratings, labelled as an estimate
 - [ ] **FIT-04**: User sees their gaps separated into required and nice-to-have, worded as "not evidenced in your resume"
 - [ ] **FIT-05**: User can mark a gap as "I do have this", which updates the result
 - [ ] **FIT-06**: User sees a learning plan for each gap (what to learn, why it matters for this job, rough effort)
 - [ ] **FIT-07**: User sees resume tailoring tips for the job (which existing experience to emphasise, which posting keywords their resume lacks) that never suggest claiming something the resume does not support
-- [ ] **FIT-08**: User sees a previous analysis instantly when reopening a job, without another AI call
+- [x] **FIT-08**: User sees a previous analysis instantly when reopening a job, without another AI call
 - [ ] **FIT-09**: User sees the fit score on the result card of any job they have analysed
 - [ ] **FIT-10**: User whose resume has changed sees earlier analyses marked "resume changed, re-check?" and can re-run them
 - [ ] **FIT-11**: User sees progress while an analysis runs and a clear, retryable message when it fails, times out or the AI service is not configured
@@ -101,13 +101,13 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 
 ### Data and Privacy
 
-- [ ] **DATA-01**: User's resume, applications, stages, analyses and chat history persist in the browser across refresh and restart
+- [x] **DATA-01**: User's resume, applications, stages, analyses and chat history persist in the browser across refresh and restart
 - [ ] **DATA-02**: User's saved data survives app updates (versioned storage with migration), and corrupted storage is set aside with a visible message instead of crashing the page
 - [ ] **DATA-03**: User can export all their data to a file
 - [ ] **DATA-04**: User can import a previously exported file to restore their data
 - [ ] **DATA-05**: User can erase all their data, including the resume
-- [ ] **DATA-06**: User's resume is sent to the server only as part of an AI request and is never stored or logged there, and the page says plainly that the AI provider processes it
-- [ ] **DATA-07**: User's AI requests are made by the server; the AI API key is never present in the browser
+- [x] **DATA-06**: User's resume is sent to the server only to read its text and to run AI requests, is never stored or logged there, and the page says plainly that the server reads it and that the AI provider processes it
+- [x] **DATA-07**: User's AI requests are made by the server; the AI API key is never present in the browser
 
 ## v2 Requirements
 
@@ -209,42 +209,42 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | PIPE-06 | Phase 5 | Pending |
 | PIPE-07 | Phase 5 | Pending |
 | PIPE-08 | Phase 5 | Pending |
-| RES-01 | Phase 1 | Pending |
-| RES-02 | Phase 1 | Pending |
-| RES-03 | Phase 1 | Pending |
-| RES-04 | Phase 1 | Pending |
-| RES-05 | Phase 1 | Pending |
-| RES-06 | Phase 1 | Pending |
-| FIT-01 | Phase 1 | Pending |
-| FIT-02 | Phase 1 | Pending |
-| FIT-03 | Phase 1 | Pending |
-| FIT-04 | Phase 1 | Pending |
-| FIT-05 | Phase 1 | Pending |
-| FIT-06 | Phase 1 | Pending |
-| FIT-07 | Phase 1 | Pending |
-| FIT-08 | Phase 1 | Pending |
+| RES-01 | Phase 01.2 | Pending |
+| RES-02 | Phase 1 | Complete |
+| RES-03 | Phase 01.2 | Pending |
+| RES-04 | Phase 01.2 | Pending |
+| RES-05 | Phase 01.2 | Pending |
+| RES-06 | Phase 01.2 | Pending |
+| FIT-01 | Phase 1 | Complete |
+| FIT-02 | Phase 1 | Complete |
+| FIT-03 | Phase 1 | Complete |
+| FIT-04 | Phase 01.1 | Pending |
+| FIT-05 | Phase 01.2 | Pending |
+| FIT-06 | Phase 01.1 | Pending |
+| FIT-07 | Phase 01.1 | Pending |
+| FIT-08 | Phase 1 | Complete |
 | FIT-09 | Phase 2 | Pending |
-| FIT-10 | Phase 1 | Pending |
-| FIT-11 | Phase 1 | Pending |
+| FIT-10 | Phase 01.2 | Pending |
+| FIT-11 | Phase 01.1 | Pending |
 | CHAT-01 | Phase 6 | Pending |
 | CHAT-02 | Phase 6 | Pending |
 | CHAT-03 | Phase 6 | Pending |
 | CHAT-04 | Phase 6 | Pending |
 | CHAT-05 | Phase 6 | Pending |
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
+| DATA-02 | Phase 01.1 | Pending |
 | DATA-03 | Phase 7 | Pending |
 | DATA-04 | Phase 7 | Pending |
 | DATA-05 | Phase 7 | Pending |
-| DATA-06 | Phase 1 | Pending |
-| DATA-07 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Complete |
+| DATA-07 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 72 total
 - Mapped to phases: 72
 - Unmapped: 0 ✓
 
-**Per phase:** Phase 1: 20, Phase 2: 15, Phase 3: 13, Phase 4: 7, Phase 5: 9, Phase 6: 5, Phase 7: 3
+**Per phase:** Phase 1: 8, Phase 01.1: 5, Phase 01.2: 7, Phase 2: 15, Phase 3: 13, Phase 4: 7, Phase 5: 9, Phase 6: 5, Phase 7: 3
 
 ---
 *Requirements defined: 2026-10-10*

@@ -51,7 +51,7 @@ it works. If a rule truly cannot apply, stop and ask the user; do not work aroun
 ## Forms
 
 - Every form uses TanStack Form with a Zod schema as the validator. Follow
-  `src/features/greeting/GreetingForm.tsx`: label tied to input, error shown with
+  `src/features/resume/PasteForm.tsx`: label tied to input, error shown with
   `role="alert"`, `aria-invalid` and `aria-describedby` set.
 
 ## Client state

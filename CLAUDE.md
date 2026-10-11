@@ -39,12 +39,13 @@ real job feeds, accounts, submitting applications, mobile layout, other LinkedIn
   evidenced) with resume quotes. Never ask the model for a score.
 - **The server is stateless.** Never store or log a resume, a request body or model output;
   log route, status and duration only.
-- **`ANTHROPIC_API_KEY` lives in `server/.env` only.** Never give it a `VITE_` prefix or read
+- **The AI provider is Google Gemini; `GEMINI_API_KEY` lives in `server/.env` only.** Never give it a `VITE_` prefix or read
   it outside `server/`. Model ids go in one server config module.
 - **Synthetic resumes only** in tests, fixtures, e2e runs and demo GIFs. Never a real person's.
 - **No LinkedIn logo, name or trademarked assets**; companies in seed data are fictional.
   Seed job ids are hand-assigned and must never change.
 - Stage dates are date-only `YYYY-MM-DD` strings; logic that depends on "today" takes the
   date as an argument.
-- `server/` has its own `package.json`, lockfile and ESLint config; root ESLint ignores it,
-  root Prettier covers it.
+- `server/` and `shared/` are npm workspaces of the root package, with one root lockfile.
+  `server/` keeps its own `package.json` and ESLint config; root ESLint ignores `server/` and
+  lints `shared/`; root Prettier covers both.

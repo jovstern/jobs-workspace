@@ -9,12 +9,16 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
+    "fake-gemini": "tsx src/test-support/fake-gemini.ts",
+    "spike:live": "tsx src/scripts/spike-live.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "vitest run",
     "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
+    "@google/genai": "2.28.0",
+    "@jobs-workspace/shared": "*",
     "express": "^5.3.0",
     "zod": "^4.6.5"
   },

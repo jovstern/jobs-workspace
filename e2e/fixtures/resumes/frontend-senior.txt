@@ -1,0 +1,79 @@
+Sam Rivera, Senior Frontend Engineer
+sam.rivera@example.com | +1 555 0142 | https://example.com/sam-rivera
+42 Example Street, Springfield, IL 62704
+
+Summary
+Frontend engineer with eight years of experience building web applications for small business software.
+Most of my work has been with React and TypeScript on products used all day by non-technical staff.
+I care about interfaces that are fast, accessible and easy to change.
+
+Experience
+
+Senior Frontend Engineer, Fernhill Dispatch (2022 to present)
+Lead the web client for a route planning product used by forty regional delivery companies.
+Built the dispatch board in React with hooks, context and a small set of composable components.
+Wrote the client in strict TypeScript, with precise types for every API response.
+Introduced runtime checks at the network boundary so malformed data never reaches a component.
+Ran accessibility audits against WCAG 2.2 and fixed keyboard navigation across the whole board.
+Tested the board with screen readers on three platforms and fixed every blocking issue we found.
+Added Playwright browser tests for the five most important user journeys.
+Wrote Vitest component tests that run in under a minute on every pull request.
+Cut the main bundle size by thirty percent by splitting routes and removing unused dependencies.
+Improved Core Web Vitals on the dispatch board, bringing largest paint under two seconds.
+Maintained the company design system, a shared component library used by four product teams.
+Documented every component in Storybook with usage notes and accessibility guidance.
+Consumed a GraphQL API from the client, with typed queries and cached results.
+Worked closely with two designers to turn rough sketches into working screens.
+Reduced the number of support tickets about the board by a third after a redesign of the shift calendar.
+
+Frontend Engineer, Owlsworth Systems (2019 to 2022)
+Built customer-facing screens for an appointment booking product with React and TypeScript.
+Moved a large form-heavy area from class components to function components with hooks.
+Created reusable form fields with labels, error messages and full keyboard support.
+Added unit tests and Cypress browser tests to a codebase that had very few.
+Profiled slow screens and fixed expensive renders, which made list screens feel instant.
+Set up a continuous integration pipeline that ran linting, type checks and tests on every change.
+Helped define the first version of a design system, with colour, spacing and type tokens.
+Worked with the support team to understand which screens confused customers.
+Shipped a calendar view that customers asked for in every feedback session.
+
+Web Developer, Tallow and Ash Studio (2016 to 2019)
+Built marketing sites and small web applications for local businesses.
+Wrote semantic HTML and CSS, with responsive layouts that worked on phones and desktops.
+Used JavaScript and a little jQuery before moving to React in my last year.
+Learned to read analytics and fix the pages where visitors gave up.
+Delivered more than thirty client sites on time and within budget.
+
+Selected projects
+
+Component library for dispatch tools
+Designed a set of fifty components with a consistent API and a shared token file.
+Every component has keyboard behaviour documented and tested.
+Published the library to a private registry and wrote the upgrade notes for each release.
+
+Performance budget
+Set a performance budget for the dispatch board and checked it on every pull request.
+Wrote a small script that fails the build when the bundle grows past the limit.
+The budget caught three regressions in the first quarter before they reached customers.
+
+Accessible date picker
+Built a date picker that works with a keyboard and with a screen reader.
+Tested it with real assistive technology and published the findings internally.
+Replaced four different date inputs across the product with this one component.
+
+Skills
+React, TypeScript, JavaScript, HTML and CSS
+Accessibility, WCAG 2.2, keyboard navigation, screen reader testing
+Playwright, Cypress, Vitest, component tests, browser tests
+Performance, bundle analysis, Core Web Vitals
+Design systems, component libraries, Storybook
+GraphQL clients and typed queries
+Continuous integration with GitHub Actions
+
+Education
+BSc Computer Science, Westmoor University (2012 to 2016)
+Final year project: a timetable planner for student societies, built with JavaScript and HTML.
+
+Interests
+Cycling, board games and restoring old radios.
+I volunteer at a weekend club that teaches teenagers to build simple websites.
