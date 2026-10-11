@@ -1,13 +1,12 @@
 import express from 'express'
-import { z } from 'zod'
+
+import type { HealthResponse } from '@jobs-workspace/shared'
 
 import type { AiClient } from './ai/client'
 import type { Env } from './config/env'
 import { createFitRouter } from './fit/routes'
 import { errorHandler, notFoundHandler } from './http/errors'
-
-export const healthResponseSchema = z.object({ status: z.literal('ok') })
-export type HealthResponse = z.infer<typeof healthResponseSchema>
+import { createJobsRouter } from './jobs/routes'
 
 export interface AppDeps {
   ai: AiClient | null
@@ -25,10 +24,11 @@ export function createApp(deps: Partial<AppDeps> = {}) {
   app.disable('x-powered-by')
 
   app.get('/api/health', (_req, res) => {
-    const body: HealthResponse = { status: 'ok' }
+    const body: HealthResponse = { status: 'ok', aiConfigured: ai !== null }
     res.json(body)
   })
 
+  app.use('/api/jobs', createJobsRouter())
   app.use('/api/fit', createFitRouter({ ai, now }))
 
   app.use(notFoundHandler)
