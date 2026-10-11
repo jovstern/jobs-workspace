@@ -11,6 +11,7 @@ import {
 import type { FitResponse, Job, RatedRequirement } from '@jobs-workspace/shared'
 
 import type { AiClient } from '../ai/client'
+import { prepareResumeForModel } from '../ai/prepare'
 import { MODELS } from '../config/models'
 import { AppError, parseBody } from '../http/errors'
 import { getJob } from '../jobs/seed'
@@ -88,10 +89,14 @@ export function createFitRouter({ ai, now }: FitRouterDeps): Router {
       if (!res.writableEnded) controller.abort()
     })
 
+    // Contact details are removed here for every request, whatever the browser sent. Nothing
+    // derived from the raw resume text may reach the prompt, and nothing here is logged.
+    const resumeForModel = prepareResumeForModel(body.resumeText)
+
     const output = await ai.generateJson({
       task: 'fit',
       system: SYSTEM_INSTRUCTION,
-      userText: buildUserText(job, body.resumeText),
+      userText: buildUserText(job, resumeForModel),
       schema: modelOutputSchema(job),
       signal: controller.signal,
     })
