@@ -46,5 +46,6 @@ real job feeds, accounts, submitting applications, mobile layout, other LinkedIn
   Seed job ids are hand-assigned and must never change.
 - Stage dates are date-only `YYYY-MM-DD` strings; logic that depends on "today" takes the
   date as an argument.
-- `server/` has its own `package.json`, lockfile and ESLint config; root ESLint ignores it,
-  root Prettier covers it.
+- `server/` and `shared/` are npm workspaces of the root package, with one root lockfile.
+  `server/` keeps its own `package.json` and ESLint config; root ESLint ignores `server/` and
+  lints `shared/`; root Prettier covers both.
