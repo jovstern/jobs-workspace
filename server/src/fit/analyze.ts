@@ -24,6 +24,7 @@ export interface AnalyzeFitInput {
   now: () => number
   overrides?: GenerateJsonRequest<unknown>['overrides']
   onUsage?: (usage: AiUsage) => void
+  onFailure?: GenerateJsonRequest<unknown>['onFailure']
 }
 
 type ModelRating = z.infer<ReturnType<typeof fitModelOutputSchema>>['ratings'][number]
@@ -63,7 +64,7 @@ function settle(requirementId: string, rated: ModelRating | undefined, index: Re
 // quote is never retried, because every call is paid. Nothing here is logged: the resume, the
 // quotes and the model output stay inside this function.
 export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
-  const { ai, job, resumeText, signal, now, overrides, onUsage } = input
+  const { ai, job, resumeText, signal, now, overrides, onUsage, onFailure } = input
 
   // The same string is sent and verified against, so the prompt and the check see the same text.
   const prepared = prepareResumeForModel(resumeText)
@@ -77,6 +78,7 @@ export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
     signal,
     overrides,
     onUsage,
+    onFailure,
   })
 
   // First answer for an id wins; ids the job does not have are never looked up.

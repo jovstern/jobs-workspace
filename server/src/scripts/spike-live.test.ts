@@ -100,6 +100,33 @@ describe('runSpike against the stand-in model', () => {
     expect(summary.recommendedDeadlineMs).toBeNull()
     fake.reset()
   })
+
+  test('a failed row carries only the status and category, in the rows and the progress lines', async () => {
+    fake.reset()
+    fake.setScenario('http_429')
+    const lines: string[] = []
+    const summary = await runSpike({
+      ai: client(),
+      resumeText,
+      mode: 'dry-run',
+      log: (line) => lines.push(line),
+    })
+    for (const row of summary.rows) {
+      expect(row.failure).toEqual({ httpStatus: 429, category: 'RESOURCE_EXHAUSTED' })
+    }
+    expect(lines[0]).toContain('429')
+    expect(lines[0]).toContain('RESOURCE_EXHAUSTED')
+    const output = JSON.stringify(summary) + lines.join('\n')
+    expect(output).not.toContain('Quota exceeded')
+    for (const sentence of fixtureSentences) expect(output).not.toContain(sentence)
+    fake.reset()
+  })
+
+  test('a successful row has no failure', async () => {
+    fake.reset()
+    const summary = await runSpike({ ai: client(), resumeText, mode: 'dry-run', requestCap: 1 })
+    expect(summary.rows[0]?.failure).toBeNull()
+  })
 })
 
 describe('modes and refusals', () => {

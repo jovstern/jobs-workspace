@@ -16,6 +16,7 @@ import type { Rating } from '@jobs-workspace/shared'
 
 import { createGeminiClient } from '../ai/client'
 import type { AiClient, AiUsage } from '../ai/client'
+import type { AiFailureDiagnostic } from '../ai/diagnose'
 import { loadServerEnv } from '../config/env'
 import type { Env } from '../config/env'
 import { MODELS } from '../config/models'
@@ -62,6 +63,8 @@ export interface CallRow {
   pair: PairName
   ok: boolean
   errorCode: string | null
+  // Status number and category of a failed call, from a fixed list. Never any text.
+  failure: AiFailureDiagnostic | null
   wallMs: number
   usage: AiUsage | null
   requiredMet: number | null
@@ -222,6 +225,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
           pair: pairName,
           ok: true,
           errorCode: null,
+          failure: null,
           wallMs: Math.round(performance.now() - startedAt),
           usage,
           requiredMet: response.ratings.filter(
@@ -239,6 +243,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
           pair: pairName,
           ok: false,
           errorCode: error instanceof AppError ? error.code : 'unexpected_error',
+          failure: null,
           wallMs: Math.round(performance.now() - startedAt),
           usage,
           requiredMet: null,

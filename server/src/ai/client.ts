@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { MODELS } from '../config/models'
 import type { AiTask, ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
+import type { AiFailureDiagnostic } from './diagnose'
 import { toGeminiSchema } from './schema'
 
 export interface AiUsage {
@@ -27,6 +28,8 @@ export interface GenerateJsonRequest<T> {
     deadlineMs?: number
   }
   onUsage?: (usage: AiUsage) => void
+  // Told, once, why a call failed: a status number and a category, never any text.
+  onFailure?: (diagnostic: AiFailureDiagnostic) => void
 }
 
 // The seam between the app and the provider. Everything above it knows tasks and schemas, not
