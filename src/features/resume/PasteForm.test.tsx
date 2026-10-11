@@ -37,6 +37,14 @@ beforeEach(() => {
   useResumeStore.setState({ resume: null })
 })
 
+// The resume as written to browser storage; null when nothing has been saved.
+function storedResume(): unknown {
+  const raw = localStorage.getItem('jw:resume')
+  if (raw === null) return null
+  const parsed = JSON.parse(raw) as { state?: { resume?: unknown } }
+  return parsed.state?.resume ?? null
+}
+
 async function paste(user: ReturnType<typeof userEvent.setup>, text: string) {
   await user.click(screen.getByLabelText('Paste your resume text'))
   await user.paste(text)
@@ -61,7 +69,7 @@ test('shows the short-text message for an empty paste and saves nothing', async 
   expect(field).toHaveAttribute('aria-invalid', 'true')
   expect(field).toHaveAttribute('aria-describedby', alert.id)
   expect(useResumeStore.getState().resume).toBeNull()
-  expect(localStorage.getItem('jw:resume')).toBeNull()
+  expect(storedResume()).toBeNull()
 })
 
 test('shows the short-text message for a paste under 50 characters and saves nothing', async () => {
@@ -74,7 +82,7 @@ test('shows the short-text message for a paste under 50 characters and saves not
   expect(await screen.findByRole('alert')).toHaveTextContent(SHORT)
   expect(screen.getByRole('button', { name: 'Review text' })).toBeInTheDocument()
   expect(useResumeStore.getState().resume).toBeNull()
-  expect(localStorage.getItem('jw:resume')).toBeNull()
+  expect(storedResume()).toBeNull()
 })
 
 test('shows the too-long message for a paste over 60,000 characters', async () => {
@@ -159,7 +167,7 @@ test('removes an email address typed into the reviewed text and saves only on th
   )
   expect(screen.getByRole('button', { name: 'Save resume' })).toBeInTheDocument()
   expect(useResumeStore.getState().resume).toBeNull()
-  expect(localStorage.getItem('jw:resume')).toBeNull()
+  expect(storedResume()).toBeNull()
 
   await user.click(screen.getByRole('button', { name: 'Save resume' }))
 
