@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 1
+current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Phase 1 UI-SPEC approved
-last_updated: "2026-10-10T19:04:09.921Z"
-last_activity: 2026-10-10
-last_activity_desc: Roadmap created (7 phases, 72/72 v1 requirements mapped)
-state_head: b4ec6083e2f078b00487736dfff46434ceff87b9
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-10-11T06:51:34.496Z"
+last_activity: 2026-10-11
+last_activity_desc: Phase 01 execution started
+state_head: 0474482bf176ae26c8957942dc26e8a9ef821b91
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10)
 
 **Core value:** The user can search for jobs and see and update the progress of every application on the same page, without ever losing their search context.
-**Current focus:** Phase 1 - Real AI path, end to end
+**Current focus:** Phase 01 — Real AI path, end to end
 
 ## Current Position
 
-Phase: 1 (Real AI path, end to end) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
+Phase: 01 (Real AI path, end to end) — EXECUTING
+Plan: 2 of 11
 Status: Ready to execute
-Last activity: 2026-10-10 - Roadmap created (7 phases, 72/72 v1 requirements mapped)
+Last activity: 2026-10-11 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P01 | 3min | 3 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -67,6 +72,8 @@ Recent decisions affecting current work:
 - [Roadmap]: Stage reorder by Move up / Move down only in v1; export/import/erase is the final phase with its own demo
 
 - [Roadmap] 2026-10-10: Phase 1 split into Phases 1, 01.1 and 01.2 (user decision at planning; the original 20-requirement phase was too large to plan at full quality). Phase 1's CONTEXT, RESEARCH, UI-SPEC, PATTERNS and VALIDATION files cover the union of the three; Phases 01.1 and 01.2 reuse them.
+- [Phase 01]: 01-01: @google/genai pinned exactly at 2.28.0 in the server workspace after user-approved registry check (D-20)
+- [Phase 01]: 01-01: tsconfig include for shared applied in the Task 2 commit because the pre-commit lint could not parse shared/ without it
 
 ### Pending Todos
 
@@ -93,6 +100,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-10T17:32:10.218Z
-Stopped at: Phase 1 UI-SPEC approved
-Resume file: .planning/phases/01-real-ai-path-end-to-end/01-UI-SPEC.md
+Last session: 2026-10-11T06:51:32.043Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None

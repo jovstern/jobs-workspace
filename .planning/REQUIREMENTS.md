@@ -107,7 +107,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 - [ ] **DATA-04**: User can import a previously exported file to restore their data
 - [ ] **DATA-05**: User can erase all their data, including the resume
 - [ ] **DATA-06**: User's resume is sent to the server only to read its text and to run AI requests, is never stored or logged there, and the page says plainly that the server reads it and that the AI provider processes it
-- [ ] **DATA-07**: User's AI requests are made by the server; the AI API key is never present in the browser
+- [x] **DATA-07**: User's AI requests are made by the server; the AI API key is never present in the browser
 
 ## v2 Requirements
 
@@ -237,7 +237,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | DATA-04 | Phase 7 | Pending |
 | DATA-05 | Phase 7 | Pending |
 | DATA-06 | Phase 1 | Pending |
-| DATA-07 | Phase 1 | Pending |
+| DATA-07 | Phase 1 | Complete |
 
 **Coverage:**
 - v1 requirements: 72 total

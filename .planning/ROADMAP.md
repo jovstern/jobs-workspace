@@ -45,11 +45,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User reopening an analysed job, including after a refresh, sees the previous analysis instantly with no new AI call; the pasted resume also survives a refresh
   5. User is told plainly that our server reads the resume without storing or logging it and that Google processes it; the AI key never appears in the browser; a failed or unconfigured AI call shows one clear, retryable message
 
-**Plans:** 11 plans
+**Plans:** 1/11 plans executed
 
 Plans:
 **Wave 1**
-- [ ] 01-01-PLAN.md — Workspace package, pinned Gemini SDK (after a blocking registry check) and the approved configuration changes
+- [x] 01-01-PLAN.md — Workspace package, pinned Gemini SDK (after a blocking registry check) and the approved configuration changes
 
 **Wave 2** *(blocked on Wave 1 completion)*
 - [ ] 01-02-PLAN.md — Tracer, server half: wire contracts, AI client over generateContent, POST /api/fit, stand-in model
@@ -215,7 +215,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Real AI path, end to end | 0/TBD | Not started | - |
+| 1. Real AI path, end to end | 1/11 | In Progress | - |
 | 01.1. Gaps, learning plan, tips and failure handling | 0/TBD | Not started | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |
