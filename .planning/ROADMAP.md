@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User reopening an analysed job, including after a refresh, sees the previous analysis instantly with no new AI call; the pasted resume also survives a refresh
   5. User is told plainly that our server reads the resume without storing or logging it and that Google processes it; the AI key never appears in the browser; a failed or unconfigured AI call shows one clear, retryable message
 
-**Plans:** 10/11 plans executed
+**Plans:** 11/11 plans executed
 
 Plans:
 **Wave 1**
@@ -65,7 +65,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 - [x] 01-08-PLAN.md — Paste form with contact removal shown to the user, persisted resume, greeting feature retired
-- [ ] 01-09-PLAN.md — Live-call spike against the real model (paid, not a gate) and model settings from the measurements
+- [x] 01-09-PLAN.md — Live-call spike against the real model (paid, not a gate) and model settings from the measurements
 
 **Wave 6** *(blocked on Wave 5 completion)*
 - [x] 01-10-PLAN.md — Score and band computed in code, result panel, running and failed states
@@ -215,7 +215,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Real AI path, end to end | 10/11 | In Progress | - |
+| 1. Real AI path, end to end | 11/11 | In Progress | - |
 | 01.1. Gaps, learning plan, tips and failure handling | 0/TBD | Not started | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |

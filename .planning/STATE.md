@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Completed 01-11-PLAN.md
-last_updated: "2026-10-11T12:17:09.646Z"
+stopped_at: Completed 01-09-PLAN.md
+last_updated: "2026-10-11T12:41:13.488Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 7d08e7586576840f96f7d90054ccc1ff2068151c
+state_head: b379d58e6c9f47eab1a7e8b54c1ce1affd692d06
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P08 | 15 min | 3 tasks | 14 files |
 | Phase 01 P10 | 17 min | 3 tasks | 13 files |
 | Phase 01 P11 | 25 min | 3 tasks | 9 files |
+| Phase 01 P09 | 256 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-10: every fit failure except ai_not_configured shows one fixed retryable message; the per-code table stays Phase 01.1
 - [Phase 01]: 01-10: score = round(100 x requiredAvg x (0.9 + 0.1 x niceAvg)), derived in render, never stored; a stored result for another resume hash or job version is hidden, not marked
 - [Phase 01]: Privacy note ships with the paid-tier paragraph: user confirmed billing on the key's Google project (2026-10-11). PAID_TIER_CONFIRMED in PrivacyNote.tsx must be set to false if billing lapses.
+- [Phase 01]: 01-09: LOW thinking chosen from live measurements (p90 4698 ms, 6/6 required met near-perfect, 0 met poor, 0 flips); MEDIUM p90 16900 ms missed the 15 s target and HIGH failed 3 of 6 calls at 60 s
+- [Phase 01]: 01-09: MODELS.fit output cap 4096 and deadline 30000 ms follow from the stated rule (floors apply) and were not tested directly; the spike ran at 16384 and 60000
+- [Phase 01]: 01-09: failure diagnostics are a closed vocabulary (status number, category, class name from fixed lists) and are surfaced only in the spike; the route and request log are unchanged
 
 ### Pending Todos
 
@@ -126,6 +130,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T12:17:09.621Z
-Stopped at: Completed 01-11-PLAN.md
+Last session: 2026-10-11T12:41:13.465Z
+Stopped at: Completed 01-09-PLAN.md
 Resume file: None
