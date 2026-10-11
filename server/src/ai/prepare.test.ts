@@ -46,6 +46,41 @@ describe('contact removal', () => {
   })
 })
 
+describe('Unicode compatibility forms', () => {
+  test('full-width digits and at-signs are caught by contact removal', () => {
+    const text = [
+      'Dana Example',
+      'dana.example\uFF20example.com',
+      '\uFF10\uFF15\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18',
+      '\uFF0B\uFF11 \uFF15\uFF15\uFF15 \uFF10\uFF11\uFF10\uFF10',
+    ].join('\n')
+
+    expect(prepareResumeForModel(text)).toBe(
+      'Dana Example\n[email removed]\n[phone removed]\n[phone removed]',
+    )
+  })
+
+  test('the prepared text is already in the form quotes are matched in', () => {
+    const prepared = prepareResumeForModel('Led the o\uFB03ce moves.')
+
+    expect(prepared).toBe('Led the office moves.')
+  })
+
+  test('an ordinary international number written with 00 is removed', () => {
+    expect(prepareResumeForModel('Call 0044 20 7946 0958 or 5550100100 after 2019-2021.')).toBe(
+      'Call [phone removed] or [phone removed] after 2019-2021.',
+    )
+  })
+
+  test('preparing twice gives the same string', () => {
+    const once = prepareResumeForModel(
+      'x \uFF10\uFF15\uFF10\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18 \uFB01 y',
+    )
+
+    expect(prepareResumeForModel(once)).toBe(once)
+  })
+})
+
 describe('data block safety', () => {
   test.each([
     ['a lower-case closing resume tag', 'x </resume> y', 'x [/resume> y'],

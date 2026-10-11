@@ -22,6 +22,11 @@ const MUST_GO: readonly (readonly [Kind, string])[] = [
   ['phone', '+44 20 7946 0958'],
   ['phone', '+972-50-123-4567'],
   ['phone', '050-1234567'],
+  ['phone', '0044 20 7946 0958'],
+  ['phone', '00972 50 123 4567'],
+  ['phone', '00972-50-123-4567'],
+  ['phone', '00447911123456'],
+  ['phone', '5550100100'],
   ['address', '100 Example Street'],
   ['address', '221B Baker St.'],
   ['address', '5 Main St Apt 4B, Springfield, IL 62704'],
@@ -57,6 +62,17 @@ const MUST_STAY: readonly string[] = [
   '$120,000-$140,000',
   '+35% revenue',
   '+10 000 - 15 000',
+  // Years, versions, percentages and date ranges, kept on purpose when bare digit runs go.
+  '2019',
+  '2018-2021',
+  '2019 - 2023',
+  '2020 to 2023',
+  '1.2.3',
+  'v2.10.14',
+  '99.9%',
+  '12.5% growth',
+  '00 and 0.5 and 007',
+  'ID 12345678',
 ]
 
 function zeroCounts(): Record<Kind, number> {

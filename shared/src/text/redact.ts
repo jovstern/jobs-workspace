@@ -103,10 +103,25 @@ const PHONE_BRACKETED = phone(String.raw`\(\d{2,4}\)[ .-]?\d{3,4}[ .-]?\d{3,4}`)
 // leading 1: 555.010.0100. Date ranges, versions and salary figures never have this shape.
 const PHONE_GROUPED = phone(String.raw`(?:1[ .-])?\d{3}[ .-]\d{3}[ .-]\d{4}`)
 
+// Matches an international number written with the 00 prefix instead of a plus sign: a country
+// code of one to three digits, then two to five more groups, each split by one space, dot or
+// hyphen (0044 20 7946 0958, 00972-50-123-4567), or the same number with no separators
+// (00447911123456). Eight or more digits must follow the 00. A spaced range such as
+// "2018 - 2021" never matches, because a separator is exactly one character.
+const PHONE_DOUBLE_ZERO = phone(String.raw`00(?:\d{1,3}(?:[ .-]\d{1,4}){2,5}|\d{8,15})`)
+
+function isDoubleZeroPhone(match: string): boolean {
+  return match.replace(/\D/g, '').length - 2 >= MIN_PLUS_PHONE_DIGITS
+}
+
 // Matches a national number with a leading zero: 050-1234567, 020 7946 0958 or 0501234567.
 const PHONE_LEADING_ZERO = phone(
   String.raw`(?:0\d{1,2}[ .-]\d{7,8}|0\d{2,4}[ .-]\d{3,4}[ .-]\d{3,4}|0\d{9,10})`,
 )
+
+// Matches a bare run of exactly ten digits (5550100100). A year, a version, a percentage or a date
+// range never has ten digits in a row, and a longer or shorter digit run is not touched.
+const PHONE_BARE_TEN = phone(String.raw`\d{10}`)
 
 // Street-type words. Abbreviations may carry a period, which goes with the address.
 const STREET_FULL = [
@@ -159,9 +174,16 @@ const RULES: readonly Rule[] = [
     placeholder: PHONE_PLACEHOLDER,
     accept: isInternationalPhone,
   },
+  {
+    kind: 'phone',
+    pattern: PHONE_DOUBLE_ZERO,
+    placeholder: PHONE_PLACEHOLDER,
+    accept: isDoubleZeroPhone,
+  },
   { kind: 'phone', pattern: PHONE_BRACKETED, placeholder: PHONE_PLACEHOLDER },
   { kind: 'phone', pattern: PHONE_GROUPED, placeholder: PHONE_PLACEHOLDER },
   { kind: 'phone', pattern: PHONE_LEADING_ZERO, placeholder: PHONE_PLACEHOLDER },
+  { kind: 'phone', pattern: PHONE_BARE_TEN, placeholder: PHONE_PLACEHOLDER },
   { kind: 'address', pattern: ADDRESS_STREET, placeholder: ADDRESS_PLACEHOLDER },
   { kind: 'address', pattern: ADDRESS_PO_BOX, placeholder: ADDRESS_PLACEHOLDER },
   { kind: 'address', pattern: ADDRESS_UK_POSTCODE, placeholder: ADDRESS_PLACEHOLDER },
