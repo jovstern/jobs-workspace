@@ -19,7 +19,7 @@ Every phase ends in something visibly working that a short demo GIF can show. UI
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Real AI path, end to end** - Paste a resume, "Check my fit" with quoted evidence and a code-computed score
+- [x] **Phase 1: Real AI path, end to end** - Paste a resume, "Check my fit" with quoted evidence and a code-computed score (completed 2026-10-11)
 - [ ] **Phase 01.1: Gaps, learning plan, tips and failure handling** (INSERTED) - Gaps, a learning plan per gap, tailoring tips, clear AI failure messages, safe handling of corrupted saved data
 - [ ] **Phase 01.2: Resume upload, review and lifecycle** (INSERTED) - PDF upload, two-step review, "I do have this", replace or delete, stale-result marker
 - [ ] **Phase 2: Workspace, search and design system** - LinkedIn-style three-pane page, full search and filters, design system, fit score on result cards
@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User reopening an analysed job, including after a refresh, sees the previous analysis instantly with no new AI call; the pasted resume also survives a refresh
   5. User is told plainly that our server reads the resume without storing or logging it and that Google processes it; the AI key never appears in the browser; a failed or unconfigured AI call shows one clear, retryable message
 
-**Plans:** 11/11 plans executed
+**Plans:** 11/11 plans complete
 
 Plans:
 **Wave 1**
@@ -215,7 +215,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Real AI path, end to end | 11/11 | In Progress | - |
+| 1. Real AI path, end to end | 11/11 | Complete    | 2026-10-11 |
 | 01.1. Gaps, learning plan, tips and failure handling | 0/TBD | Not started | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |

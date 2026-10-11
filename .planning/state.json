@@ -6,7 +6,7 @@
     {
       "number": "1",
       "name": "Real AI path, end to end",
-      "status": "in_progress"
+      "status": "complete"
     },
     {
       "number": "01.1",
@@ -51,8 +51,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 01 of 9 · 0% · executing"
+    "label": "Advance to the next step (plan phase 01.1)",
+    "reason": "Phase 01.1 of 9 — needs a plan"
   },
-  "updated_at": "2026-10-11T12:17:05.296Z"
+  "updated_at": "2026-10-11T13:29:25.794Z"
 }
