@@ -6,6 +6,7 @@ import type { AiClient } from './ai/client'
 import type { Env } from './config/env'
 import { createFitRouter } from './fit/routes'
 import { errorHandler, notFoundHandler } from './http/errors'
+import { requestLog } from './http/request-log'
 import { createJobsRouter } from './jobs/routes'
 
 export interface AppDeps {
@@ -15,13 +16,16 @@ export interface AppDeps {
   log: (line: string) => void
 }
 
-// `env` and `log` are accepted now and consumed by later plans (origin checks, request log).
+// `env` is accepted now and consumed by a later task (origin checks).
 export function createApp(deps: Partial<AppDeps> = {}) {
   const ai = deps.ai ?? null
   const now = deps.now ?? Date.now
+  // Quiet by default so tests stay silent; the running server passes a real logger.
+  const log = deps.log ?? (() => undefined)
 
   const app = express()
   app.disable('x-powered-by')
+  app.use(requestLog({ log, now }))
 
   app.get('/api/health', (_req, res) => {
     const body: HealthResponse = { status: 'ok', aiConfigured: ai !== null }

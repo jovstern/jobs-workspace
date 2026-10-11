@@ -14,7 +14,13 @@ const ai =
       })
 
 // Loopback only: this server proxies AI calls and must not be reachable from the network.
-createApp({ ai, env }).listen(env.port, '127.0.0.1', () => {
+createApp({
+  ai,
+  env,
+  log: (line) => {
+    console.log(line)
+  },
+}).listen(env.port, '127.0.0.1', () => {
   console.log(
     `server listening on http://127.0.0.1:${String(env.port)} (AI configured: ${ai === null ? 'no' : 'yes'})`,
   )
