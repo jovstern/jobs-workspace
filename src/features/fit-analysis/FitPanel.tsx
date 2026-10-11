@@ -1,8 +1,15 @@
-import type { Job, Rating } from '@jobs-workspace/shared'
+import type { Job } from '@jobs-workspace/shared'
+import { Progress } from 'radix-ui'
+import { useId, useState } from 'react'
 
+import { Button } from '../../components/Button'
+import { Notice } from '../../components/Notice'
 import { ApiError } from '../../lib/api'
 import { useFitStore } from './fit-store'
 import { useCheckFit, useIsCheckingFit } from './mutations'
+import { RequirementsSection } from './RequirementsSection'
+import { ScoreBlock } from './ScoreBlock'
+import { buildFitView, selectCurrentAnalysis } from './selectors'
 
 interface FitPanelProps {
   job: Job
@@ -10,26 +17,40 @@ interface FitPanelProps {
   unavailableReason?: string
 }
 
-const RATING_LABELS: Record<Rating, string> = {
-  met: 'Met',
-  partial: 'Partial',
-  not_evidenced: 'Not evidenced',
+const NO_RESUME_REASON = 'Add your resume to check your fit.'
+const NO_RESULT_TEXT =
+  'No fit check yet. Select Check my fit to compare your resume with these requirements.'
+const GENERIC_ERROR = 'Something went wrong on our side. Try again.'
+const NOT_CONFIGURED_ERROR =
+  'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server.'
+
+// Runs once when the element is added to the page; the identity is stable so it never re-runs.
+function focusOnMount(element: HTMLElement | null) {
+  element?.focus()
 }
 
-const GENERIC_ERROR = 'Something went wrong on our side. Try again.'
-
+// The fit region of the job detail. A check starts only from a click handler here: never on
+// render, selection, refresh, focus, a timer or a reconnect. The result is derived in render from
+// the stored ratings; nothing about the score is kept in state.
 export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
-  const analysis = useFitStore((state) => state.byJobId[job.id])
+  const reasonId = useId()
+  const byJobId = useFitStore((state) => state.byJobId)
   const checkFit = useCheckFit()
   const isChecking = useIsCheckingFit(job.id)
+  const [focusRerun, setFocusRerun] = useState(false)
 
-  const isBlocked = resume === null || unavailableReason !== undefined || isChecking
+  const analysis = selectCurrentAnalysis(byJobId, job, resume?.textHash ?? null)
+  const view = analysis ? buildFitView(job, analysis) : null
+
+  const reason = unavailableReason ?? (resume === null ? NO_RESUME_REASON : undefined)
+  const isUnavailable = reason !== undefined || isChecking
+
   const failure = checkFit.isError ? checkFit.error : null
-  const failureMessage = failure instanceof ApiError ? failure.message : GENERIC_ERROR
-  const canRetry = !(failure instanceof ApiError) || failure.retryable
+  const notConfigured = failure instanceof ApiError && failure.code === 'ai_not_configured'
 
-  function startCheck() {
-    if (isBlocked) return
+  function startCheck(fromPrimary: boolean) {
+    if (isUnavailable || resume === null) return
+    if (fromPrimary) setFocusRerun(true)
     checkFit.mutate({ jobId: job.id, resumeText: resume.text, resumeHash: resume.textHash })
   }
 
@@ -38,59 +59,101 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
     checkFit.mutate(checkFit.variables)
   }
 
-  return (
-    <section aria-labelledby="fit-heading">
-      <h2 id="fit-heading" className="mb-2 text-lg font-semibold">
-        {job.title}
-      </h2>
+  const completion =
+    checkFit.isSuccess && view?.score != null && view.band !== null
+      ? `Fit check complete. Fit estimate ${String(view.score)}%, ${view.band}.`
+      : null
 
-      {analysis ? (
-        <ol aria-label="Rated requirements" className="space-y-3">
-          {analysis.ratings.map((rating) => {
-            const requirement = job.requirements.find((item) => item.id === rating.requirementId)
-            if (!requirement) return null
-            return (
-              <li key={rating.requirementId}>
-                <p>{requirement.text}</p>
-                <p className="font-medium">{RATING_LABELS[rating.rating]}</p>
-                {rating.rating !== 'not_evidenced' && rating.quote !== null ? (
-                  <p className="text-neutral-700">
-                    <span>From your resume:</span> {rating.quote}
-                  </p>
-                ) : null}
-              </li>
-            )
-          })}
-        </ol>
-      ) : (
-        <div>
-          {isChecking ? <p role="status">Checking your fit</p> : null}
-          {unavailableReason !== undefined ? <p>{unavailableReason}</p> : null}
-          {failure ? (
-            <div role="alert">
-              <p>{failureMessage}</p>
-              {canRetry ? (
-                <button
-                  type="button"
-                  aria-disabled={isChecking}
-                  onClick={retry}
-                  className="mt-1 rounded border border-neutral-400 px-3 py-1"
-                >
-                  Try again
-                </button>
-              ) : null}
-            </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h2 className="min-w-0 text-xl leading-[1.2] font-semibold break-words text-gray-900">
+          Your fit for {job.title}
+        </h2>
+        {view ? (
+          <Button
+            variant="secondary"
+            aria-disabled={isUnavailable}
+            aria-describedby={reason !== undefined ? reasonId : undefined}
+            ref={focusRerun ? focusOnMount : undefined}
+            onClick={() => {
+              startCheck(false)
+            }}
+          >
+            Check again
+          </Button>
+        ) : null}
+      </div>
+
+      {reason !== undefined ? (
+        <p id={reasonId} className="text-sm text-gray-600">
+          {reason}
+        </p>
+      ) : null}
+
+      <div role="status" className={isChecking ? 'flex flex-col gap-2' : 'sr-only'}>
+        {isChecking ? (
+          <>
+            <p className="text-base font-semibold text-gray-900">Checking your fit</p>
+            <p className="text-sm text-gray-600">Usually 10 to 20 seconds.</p>
+          </>
+        ) : (
+          completion
+        )}
+      </div>
+
+      {isChecking ? (
+        <Progress.Root
+          aria-label="Checking your fit"
+          className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+        >
+          <Progress.Indicator className="h-full w-full animate-pulse rounded-full bg-blue-700 motion-reduce:animate-none" />
+        </Progress.Root>
+      ) : null}
+
+      {!isChecking && failure ? (
+        <Notice tone="danger" role="alert" heading="Could not check your fit">
+          <p className="text-base">{notConfigured ? NOT_CONFIGURED_ERROR : GENERIC_ERROR}</p>
+          {notConfigured ? null : (
+            <Button variant="secondary" onClick={retry}>
+              Try again
+            </Button>
+          )}
+        </Notice>
+      ) : null}
+
+      {!isChecking && view ? (
+        <>
+          {view.score !== null && view.band !== null && analysis ? (
+            <ScoreBlock
+              score={view.score}
+              band={view.band}
+              requiredMet={view.requiredMet}
+              requiredTotal={view.requiredTotal}
+              analysedAt={analysis.analysedAt}
+            />
           ) : null}
-          <button
-            type="button"
-            aria-disabled={isBlocked}
-            onClick={startCheck}
-            className="mt-2 rounded bg-blue-700 px-4 py-2 text-white aria-disabled:opacity-50"
+          <div className="mt-8">
+            <RequirementsSection required={view.required} niceToHave={view.niceToHave} />
+          </div>
+        </>
+      ) : null}
+
+      {view === null ? (
+        <div className="flex flex-col items-start gap-4">
+          {isChecking ? null : <p className="text-base text-gray-900">{NO_RESULT_TEXT}</p>}
+          <Button
+            variant="primary"
+            aria-disabled={isUnavailable}
+            aria-describedby={reason !== undefined ? reasonId : undefined}
+            onClick={() => {
+              startCheck(true)
+            }}
           >
             Check my fit
-          </button>
+          </Button>
         </div>
-      )}
-    </section>
+      ) : null}
+    </div>
   )
 }
