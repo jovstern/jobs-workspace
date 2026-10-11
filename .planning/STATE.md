@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-10-11T06:51:34.496Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-10-11T07:05:26.359Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 0474482bf176ae26c8957942dc26e8a9ef821b91
+state_head: 085320d9aeda48271e3ede68f0db0d843062ca32
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01 (Real AI path, end to end) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 Status: Ready to execute
 Last activity: 2026-10-11 — Phase 01 execution started
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 3min | 3 tasks | 13 files |
+| Phase 01 P02 | 8 min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Roadmap] 2026-10-10: Phase 1 split into Phases 1, 01.1 and 01.2 (user decision at planning; the original 20-requirement phase was too large to plan at full quality). Phase 1's CONTEXT, RESEARCH, UI-SPEC, PATTERNS and VALIDATION files cover the union of the three; Phases 01.1 and 01.2 reuse them.
 - [Phase 01]: 01-01: @google/genai pinned exactly at 2.28.0 in the server workspace after user-approved registry check (D-20)
 - [Phase 01]: 01-01: tsconfig include for shared applied in the Task 2 commit because the pre-commit lint could not parse shared/ without it
+- [Phase 01]: Seed job id job-frontend-senior and requirement ids fe-sr-r1 to fe-sr-r8 are final; AiClient keeps the provider inside server/src/ai and model ids live only in config/models.ts
+- [Phase 01]: createApp reads only ai and now from its deps; env and log are typed in AppDeps but consumed by plan 01-06
 
 ### Pending Todos
 
@@ -100,6 +103,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T06:51:32.043Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-10-11T07:05:21.848Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
