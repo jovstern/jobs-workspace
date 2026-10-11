@@ -1,10 +1,11 @@
 import type { Rating } from '../fit'
 import type { Requirement } from '../job'
 
-// Red-phase stand-in: the real formula arrives in the next commit.
-export type Band = 'Strong fit' | 'Good fit' | 'Stretch' | 'Long shot'
-export const BANDS: readonly Band[] = []
-export const CREDIT: Record<Rating, number> = { met: 0, partial: 0, not_evidenced: 0 }
+export const BANDS = ['Strong fit', 'Good fit', 'Stretch', 'Long shot'] as const
+export type Band = (typeof BANDS)[number]
+
+// Met is full credit, partial is half, not evidenced is none (D-10).
+export const CREDIT: Record<Rating, number> = { met: 1, partial: 0.5, not_evidenced: 0 }
 
 export interface FitScore {
   score: number | null
@@ -13,13 +14,49 @@ export interface FitScore {
   requiredTotal: number
 }
 
-export function bandFor(score: number): Band {
-  return score > Infinity ? 'Strong fit' : 'Long shot'
-}
-
-export function computeFit(input: {
+interface ComputeFitInput {
   requirements: readonly Requirement[]
   ratings: readonly { requirementId: string; rating: Rating }[]
-}): FitScore {
-  return { score: null, band: null, requiredMet: input.ratings.length * 0, requiredTotal: 0 }
+}
+
+// Thresholds are inclusive lower bounds: 80, 60 and 40 land in the higher band (D-11).
+export function bandFor(score: number): Band {
+  if (score >= 80) return 'Strong fit'
+  if (score >= 60) return 'Good fit'
+  if (score >= 40) return 'Stretch'
+  return 'Long shot'
+}
+
+function average(credits: readonly number[]): number {
+  if (credits.length === 0) return 0
+  return credits.reduce((sum, credit) => sum + credit, 0) / credits.length
+}
+
+// The score is a pure function of the job's requirements and the rated results; it is never
+// stored and never taken from the model (D-10). Required requirements carry the score; the
+// nice-to-have average adds at most 10 percent on top and cannot lift a job with no required
+// credit above 0. The order of operations matters: it decides rounding at the boundaries.
+export function computeFit({ requirements, ratings }: ComputeFitInput): FitScore {
+  const ratingById = new Map<string, Rating>()
+  for (const item of ratings) {
+    if (!ratingById.has(item.requirementId)) ratingById.set(item.requirementId, item.rating)
+  }
+
+  const ratingOf = (requirement: Requirement): Rating =>
+    ratingById.get(requirement.id) ?? 'not_evidenced'
+
+  const required = requirements.filter((requirement) => requirement.kind === 'required')
+  const niceToHave = requirements.filter((requirement) => requirement.kind === 'nice_to_have')
+  const requiredMet = required.filter((requirement) => ratingOf(requirement) === 'met').length
+
+  if (required.length === 0) {
+    return { score: null, band: null, requiredMet, requiredTotal: 0 }
+  }
+
+  const requiredAverage = average(required.map((requirement) => CREDIT[ratingOf(requirement)]))
+  const niceAverage = average(niceToHave.map((requirement) => CREDIT[ratingOf(requirement)]))
+  const raw = Math.round(100 * requiredAverage * (0.9 + 0.1 * niceAverage))
+  const score = Math.min(100, Math.max(0, raw))
+
+  return { score, band: bandFor(score), requiredMet, requiredTotal: required.length }
 }
