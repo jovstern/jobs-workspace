@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { MODELS } from '../config/models'
 import type { AiTask, ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
+import { toGeminiSchema } from './schema'
 
 export interface AiUsage {
   promptTokens: number
@@ -46,12 +47,6 @@ const THINKING_LEVELS: Record<ThinkingLevelName, ThinkingLevel> = {
   HIGH: ThinkingLevel.HIGH,
 }
 
-// Plan 01-07 replaces this with an allow-list helper that checks every keyword.
-function toResponseJsonSchema(schema: z.ZodType): Record<string, unknown> {
-  const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7' })
-  return Object.fromEntries(Object.entries(jsonSchema).filter(([key]) => key !== '$schema'))
-}
-
 export function createGeminiClient(options: GeminiClientOptions): AiClient {
   const genai = new GoogleGenAI({
     apiKey: options.apiKey,
@@ -72,7 +67,7 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
         config: {
           systemInstruction: request.system,
           responseMimeType: 'application/json',
-          responseJsonSchema: toResponseJsonSchema(request.schema),
+          responseJsonSchema: toGeminiSchema(request.schema),
           thinkingConfig: {
             thinkingLevel: THINKING_LEVELS[request.overrides?.thinking ?? model.thinking],
           },
