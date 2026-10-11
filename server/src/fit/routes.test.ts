@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { createApp } from '../app'
 import { createGeminiClient } from '../ai/client'
 import type { AiClient } from '../ai/client'
+import { getJob } from '../jobs/seed'
 import { startFakeGemini } from '../test-support/fake-gemini'
 import type { FakeGemini } from '../test-support/fake-gemini'
 
@@ -129,6 +130,30 @@ test('answers 503 ai_not_configured without calling any model when no AI client 
   expect(body.error.code).toBe('ai_not_configured')
   expect(body.error.retryable).toBe(false)
   expect(fake.requestCount()).toBe(0)
+})
+
+test('a quote the stand-in model invents is rejected, and only that rating changes', async () => {
+  const requirementIds = (getJob(JOB_ID)?.requirements ?? []).map((requirement) => requirement.id)
+  const baseline = fitResponseSchema.parse(
+    JSON.parse((await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })).text),
+  )
+  fake.reset()
+  fake.setScenario('hallucinated_quote')
+
+  const { status, text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+
+  expect(status).toBe(200)
+  expect(fake.requestCount()).toBe(1)
+  const body = fitResponseSchema.parse(JSON.parse(text))
+  expect(body.ratings.map((rating) => rating.requirementId)).toEqual(requirementIds)
+  const rejected = body.ratings.filter((rating) => rating.quoteRejected)
+  expect(rejected).toHaveLength(1)
+  expect(rejected[0]).toMatchObject({ rating: 'not_evidenced', quote: null, rationale: '' })
+  const others = body.ratings.filter((rating) => !rating.quoteRejected)
+  expect(others).toEqual(
+    baseline.ratings.filter((rating) => rating.requirementId !== rejected[0]?.requirementId),
+  )
+  expect(baseline.ratings.some((rating) => rating.quoteRejected)).toBe(false)
 })
 
 describe('requests that must never reach the model', () => {
