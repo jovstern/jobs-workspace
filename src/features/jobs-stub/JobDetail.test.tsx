@@ -28,15 +28,19 @@ const JOB: Job = {
 }
 
 let fetchMock: ReturnType<typeof vi.fn>
+let healthResponse: () => Promise<Response>
+
+function json(body: unknown) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
 
 beforeEach(() => {
-  fetchMock = vi.fn(() =>
-    Promise.resolve(
-      new Response(JSON.stringify({ jobs: [JOB] }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
-    ),
+  healthResponse = () => Promise.resolve(json({ status: 'ok', aiConfigured: true }))
+  fetchMock = vi.fn((input: string) =>
+    input === '/api/health' ? healthResponse() : Promise.resolve(json({ jobs: [JOB] })),
   )
   vi.stubGlobal('fetch', fetchMock)
 })
@@ -129,4 +133,61 @@ test('selecting a job shows its posting next to the list', async () => {
 
   expect(screen.getByRole('heading', { level: 3, name: 'Required' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Select a job' })).not.toBeInTheDocument()
+})
+
+const NOT_CONFIGURED =
+  'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server. Fit checks are unavailable until then.'
+const UNREACHABLE = "Can't reach the app server (is it running?)"
+const RESUME = { text: 'Sam Example, Frontend Engineer', textHash: 'hash-1' }
+
+test('when health says AI is not configured, shows a status notice and explains the disabled button', async () => {
+  healthResponse = () => Promise.resolve(json({ status: 'ok', aiConfigured: false }))
+  renderWithQuery(<JobDetail job={JOB} resume={RESUME} />)
+
+  const notice = await screen.findByText(NOT_CONFIGURED)
+  expect(notice.closest('[role="status"]')).not.toBeNull()
+
+  const check = screen.getByRole('button', { name: 'Check my fit' })
+  expect(check).toHaveAttribute('aria-disabled', 'true')
+  expect(check).toHaveAccessibleDescription('AI is not set up.')
+})
+
+test('when the health request fails, says the app server cannot be reached and disables the button', async () => {
+  healthResponse = () => Promise.reject(new TypeError('network down'))
+  renderWithQuery(<JobDetail job={JOB} resume={RESUME} />)
+
+  const messages = await screen.findAllByText(UNREACHABLE)
+  expect(messages[0]?.closest('[role="status"]')).not.toBeNull()
+
+  const check = screen.getByRole('button', { name: 'Check my fit' })
+  expect(check).toHaveAttribute('aria-disabled', 'true')
+  expect(check).toHaveAccessibleDescription(UNREACHABLE)
+})
+
+test('when health says AI is configured, shows no notice and leaves the button available', async () => {
+  renderWithQuery(<JobDetail job={JOB} resume={RESUME} />)
+
+  await vi.waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledWith('/api/health', expect.anything())
+  })
+  // Let the answer settle into the page before asserting that nothing appeared.
+  await new Promise((resolve) => setTimeout(resolve, 20))
+  expect(screen.getByRole('button', { name: 'Check my fit' })).toHaveAttribute(
+    'aria-disabled',
+    'false',
+  )
+  expect(screen.queryByText(/AI is not set up/)).not.toBeInTheDocument()
+  expect(screen.queryByText(UNREACHABLE)).not.toBeInTheDocument()
+})
+
+test('while health is still loading, shows no notice and leaves the button available', () => {
+  healthResponse = () => new Promise<Response>(() => undefined)
+  renderWithQuery(<JobDetail job={JOB} resume={RESUME} />)
+
+  expect(screen.getByRole('button', { name: 'Check my fit' })).toHaveAttribute(
+    'aria-disabled',
+    'false',
+  )
+  expect(screen.queryByText(/AI is not set up/)).not.toBeInTheDocument()
+  expect(screen.queryByText(UNREACHABLE)).not.toBeInTheDocument()
 })
