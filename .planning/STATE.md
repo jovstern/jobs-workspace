@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Completed 01-05-PLAN.md
-last_updated: "2026-10-11T08:02:29.344Z"
+stopped_at: Completed 01-06-PLAN.md
+last_updated: "2026-10-11T08:08:22.755Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 21d18cc364a61cc87af03ccb80a6f9319cd4bebe
+state_head: e7725c5075c7fadf703c284a0077863921352508
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01 (Real AI path, end to end) — EXECUTING
-Plan: 6 of 11
+Plan: 7 of 11
 Status: Ready to execute
 Last activity: 2026-10-11 — Phase 01 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P03 | 25 min | 2 tasks | 16 files |
 | Phase 01 P04 | 5 min | 2 tasks | 7 files |
 | Phase 01 P05 | 34 min | 2 tasks | 15 files |
+| Phase 01 P06 | 6 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-04: plus-prefixed phone candidates are validated in code (8+ digits, no spaced hyphen) to keep the pattern bounded
 - [Phase 01]: Seed job and requirement ids pinned as literals in seed.test.ts; job-frontend-senior content version 14714af0fe5ddc87 unchanged
 - [Phase 01]: FitPanel left untouched in 01-05; its duplicate title heading and nested section are deferred to plan 01-10
+- [Phase 01]: 01-06: rate limiter hand-written (D-19), no dependency; origin guard runs before the limiter so refused foreign requests use no quota
+- [Phase 01]: 01-06: content-type rule covers every method except GET, HEAD, OPTIONS; non-JSON fit POST now answers 415
 
 ### Pending Todos
 
@@ -113,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T08:02:29.320Z
-Stopped at: Completed 01-05-PLAN.md
+Last session: 2026-10-11T08:08:19.786Z
+Stopped at: Completed 01-06-PLAN.md
 Resume file: None
