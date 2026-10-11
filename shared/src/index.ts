@@ -1,2 +1,5 @@
 export * from './health'
 export * from './error'
+export * from './job'
+export * from './resume'
+export * from './fit'
