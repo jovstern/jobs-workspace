@@ -45,7 +45,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. User reopening an analysed job, including after a refresh, sees the previous analysis instantly with no new AI call; the pasted resume also survives a refresh
   5. User is told plainly that our server reads the resume without storing or logging it and that Google processes it; the AI key never appears in the browser; a failed or unconfigured AI call shows one clear, retryable message
 
-**Plans:** 4/11 plans executed
+**Plans:** 5/11 plans executed
 
 Plans:
 **Wave 1**
@@ -59,7 +59,7 @@ Plans:
 - [x] 01-04-PLAN.md — Contact details and links removed in shared code and enforced on the server before any model call
 
 **Wave 4** *(blocked on Wave 3 completion)*
-- [ ] 01-05-PLAN.md — Nine hand-written seed jobs, the synthetic demo resume, job list and job detail page
+- [x] 01-05-PLAN.md — Nine hand-written seed jobs, the synthetic demo resume, job list and job detail page
 - [ ] 01-06-PLAN.md — Server guards: metadata-only logs, origin check, hand-written rate limiter
 - [ ] 01-07-PLAN.md — Evidence-checked ratings: quote verification, id reconciliation, supported-keyword schema
 
@@ -215,7 +215,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Real AI path, end to end | 4/11 | In Progress | - |
+| 1. Real AI path, end to end | 5/11 | In Progress | - |
 | 01.1. Gaps, learning plan, tips and failure handling | 0/TBD | Not started | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |
