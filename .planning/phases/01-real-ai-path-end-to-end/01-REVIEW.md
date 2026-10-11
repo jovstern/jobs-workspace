@@ -236,6 +236,22 @@ If that happens, the badge shown for a requirement can differ from the one that 
 **Issue:** The claim "Google says it does not use this content to improve its products" depends on billing being active on the key's project. It is recorded as confirmed on a date, as a source constant, with no runtime check. If billing lapses the claim silently becomes untrue, and the developer-facing comment is the only safeguard. This was recorded as a deliberate decision in plan 01-11, so it is not a defect to fix now, only a reminder.
 **Fix:** None needed in Phase 1. Revisit when the settings or key-status UI arrives.
 
+## Resolution
+
+Fixed by `/gsd-code-review --fix` on 2026-10-11, one commit per finding, each with a test that fails before the fix.
+
+| Finding | State | Commit |
+|---------|-------|--------|
+| WR-01 | fixed | 990efd2 |
+| WR-02 | fixed | ab64102 |
+| WR-03 | fixed | 4caf6f8 |
+| WR-04 | fixed | 8090684 |
+| WR-05 | fixed | ffc1119 |
+| WR-06 | deferred to Phase 01.1 (FIT-11); logged in `deferred-items.md` | none |
+| WR-07 | fixed | 1f2d2d3 |
+| WR-08 | fixed | 073a326 |
+| IN-01 to IN-05 | open, out of the fix scope (Info) | none |
+
 ---
 
 _Reviewed: 2026-10-11_
