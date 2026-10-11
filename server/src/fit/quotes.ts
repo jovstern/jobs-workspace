@@ -45,8 +45,19 @@ function canonicalise(text: string): string {
     .replace(DOUBLE_QUOTES, '"')
 }
 
+// A period inside a token stays (node.js, 3.8, e.g.). One at either end of a token is sentence
+// punctuation, or part of a leading "." such as ".NET", and is dropped on both sides, so a quote
+// that gains or loses a final full stop still matches.
+const EDGE_PERIODS = /^\.+|\.+$/g
+
 function collapse(canonical: string): string {
-  return canonical.toLowerCase().replace(SEPARATOR_RUN, ' ').trim()
+  return canonical
+    .toLowerCase()
+    .replace(SEPARATOR_RUN, ' ')
+    .split(' ')
+    .map((token) => token.replace(EDGE_PERIODS, ''))
+    .filter((token) => token !== '')
+    .join(' ')
 }
 
 // The form both the resume and a quote are compared in.

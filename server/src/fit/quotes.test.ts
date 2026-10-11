@@ -120,6 +120,33 @@ describe('quotes that are in the resume', () => {
     expect(accepts(resume, quote)).toBe(true)
   })
 
+  describe('sentence punctuation the model added or dropped', () => {
+    const BULLET_RESUME =
+      '- Reduced page load time by 40%\n- Built a design system used by 12 teams'
+
+    test('a final full stop on a bullet that has none', () => {
+      expect(accepts(BULLET_RESUME, 'Reduced page load time by 40%.')).toBe(true)
+      expect(accepts(BULLET_RESUME, 'Built a design system used by 12 teams.')).toBe(true)
+    })
+
+    test('a leading full stop', () => {
+      expect(accepts(BULLET_RESUME, '.Reduced page load time by 40%')).toBe(true)
+    })
+
+    test('a resume line that ends in a full stop against a quote without one', () => {
+      expect(
+        accepts('Wrote parsers for the billing export.', 'Wrote parsers for the billing export'),
+      ).toBe(true)
+    })
+
+    test('a full stop inside a token is kept: node.js and 3.8 do not match njs or 38', () => {
+      const resume = 'Upgraded the batch jobs to Python 3.8 and Node.js tooling.'
+
+      expect(accepts(resume, 'batch jobs to Python 3.8 and Node.js')).toBe(true)
+      expect(accepts(resume, 'batch jobs to Python 38 and Nodejs')).toBe(false)
+    })
+  })
+
   test('a quote with a placeholder from contact removal', () => {
     const resume = 'Reach me at [email removed] for references from my last employer.'
 
