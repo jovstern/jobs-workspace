@@ -60,7 +60,7 @@ describe('quotes that are in the resume', () => {
 
     test('a soft hyphen at the end of a line joins the word', () => {
       expect(
-        accepts('Built full­\nstack web applications.', 'Built fullstack web applications'),
+        accepts('Built full\u00AD\nstack web applications.', 'Built fullstack web applications'),
       ).toBe(true)
     })
   })
@@ -68,7 +68,7 @@ describe('quotes that are in the resume', () => {
   test('a ligature character in the resume against plain letters in the quote', () => {
     expect(
       accepts(
-        'Led the oﬃce moves and the ﬁnance reporting.',
+        'Led the o\uFB03ce moves and the \uFB01nance reporting.',
         'Led the office moves and the finance reporting',
       ),
     ).toBe(true)
@@ -77,14 +77,14 @@ describe('quotes that are in the resume', () => {
   test('a bullet in the resume against a quote without it', () => {
     expect(
       accepts(
-        '• Reduced bundle size by thirty percent\n• Added tests',
+        '\u2022 Reduced bundle size by thirty percent\n\u2022 Added tests',
         'Reduced bundle size by thirty percent',
       ),
     ).toBe(true)
   })
 
   test('smart quotes in the resume against straight quotes in the quote', () => {
-    const resume = 'Wrote the “design tokens” guide and the team’s release notes.'
+    const resume = 'Wrote the \u201Cdesign tokens\u201D guide and the team\u2019s release notes.'
 
     expect(accepts(resume, 'Wrote the "design tokens" guide and the team\'s release notes')).toBe(
       true,
@@ -93,7 +93,10 @@ describe('quotes that are in the resume', () => {
 
   test('an en dash in the resume against a hyphen in the quote', () => {
     expect(
-      accepts('Worked 2019–2023 on the dispatch board.', 'Worked 2019-2023 on the dispatch board'),
+      accepts(
+        'Worked 2019\u20132023 on the dispatch board.',
+        'Worked 2019-2023 on the dispatch board',
+      ),
     ).toBe(true)
   })
 
@@ -135,7 +138,7 @@ describe('quotes that are in the resume', () => {
 
     test('with the single ellipsis character', () => {
       expect(
-        accepts(RESUME, 'Delivered the checkout redesign … forty percent across all routes'),
+        accepts(RESUME, 'Delivered the checkout redesign \u2026 forty percent across all routes'),
       ).toBe(true)
     })
   })
@@ -216,14 +219,14 @@ describe('normaliseForMatch', () => {
   })
 
   test('folds ligatures, full-width forms and non-breaking spaces', () => {
-    expect(normaliseForMatch('ﬁnd ＡＢ')).toBe('find ab')
+    expect(normaliseForMatch('\uFB01nd\u00A0\uFF21\uFF22')).toBe('find ab')
   })
 
   test('removes soft hyphens and zero-width characters', () => {
-    expect(normaliseForMatch('ab­cd​ef﻿gh')).toBe('abcdefgh')
+    expect(normaliseForMatch('ab\u00ADcd\u200Bef\uFEFFgh')).toBe('abcdefgh')
   })
 
   test('keeps letters from other scripts', () => {
-    expect(normaliseForMatch('Zoë, Señor')).toBe('zoë señor')
+    expect(normaliseForMatch('Zo\u00EB, Se\u00F1or')).toBe('zo\u00EB se\u00F1or')
   })
 })
