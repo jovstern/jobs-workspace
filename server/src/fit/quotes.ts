@@ -76,12 +76,53 @@ export function buildResumeIndex(resumeText: string): ResumeIndex {
   }
 }
 
-// True when every segment occurs in the text, one after another and without overlapping.
-function occursInOrder(segments: readonly string[], text: string): boolean {
+// Where a segment of an ellipsis quote may sit: no further than this many normalised characters
+// after the end of the previous segment. An ellipsis stands for a short elision inside one passage,
+// not for "somewhere later in the resume".
+export const MAX_SEGMENT_GAP = 200
+
+// Every segment of an ellipsis quote must be substantial on its own, so that single words picked
+// from different lines cannot be stitched into a "quote".
+export const MIN_SEGMENT_LENGTH = 8
+
+interface Segment {
+  // The normalised segment, searched for in the resume.
+  text: string
+  // How much of it is real resume text rather than a contact-removal placeholder.
+  evidence: number
+}
+
+function toSegment(raw: string): Segment {
+  return { text: collapse(raw), evidence: collapse(stripContactPlaceholders(raw)).length }
+}
+
+// A match must start and end on a word boundary of the normalised text, where a boundary is the
+// edge of the text or a space. "ython scripting" is not a quote of "python scripting".
+function isWordBounded(text: string, at: number, length: number): boolean {
+  const end = at + length
+  return (at === 0 || text[at - 1] === ' ') && (end === text.length || text[end] === ' ')
+}
+
+// The first word-bounded occurrence of the segment at or after `from`, or -1.
+function findBounded(text: string, segment: string, from: number): number {
+  let at = text.indexOf(segment, from)
+  while (at !== -1 && !isWordBounded(text, at, segment.length)) {
+    at = text.indexOf(segment, at + 1)
+  }
+  return at
+}
+
+// True when every segment occurs in the text on word boundaries, one after another, without
+// overlapping, and within MAX_SEGMENT_GAP of the one before. Taking the earliest match each time is
+// enough: a later one could only be further from the previous segment.
+function occursInOrder(segments: readonly Segment[], text: string): boolean {
   let from = 0
-  for (const segment of segments) {
-    const at = text.indexOf(segment, from)
+  let first = true
+  for (const { text: segment } of segments) {
+    const at = findBounded(text, segment, from)
     if (at === -1) return false
+    if (!first && at - from > MAX_SEGMENT_GAP) return false
+    first = false
     from = at + segment.length
   }
   return true
@@ -90,21 +131,24 @@ function occursInOrder(segments: readonly string[], text: string): boolean {
 // A placeholder such as "[email removed]" stands where the resume held contact details. It is in
 // the text that was sent, so it can be matched, but it says nothing about the person's work. It
 // does not count towards the minimum length, and it may not make up more than half of a quote.
-function isMostlyEvidence(segments: readonly string[], rawSegments: readonly string[]): boolean {
-  const total = segments.reduce((sum, segment) => sum + segment.length, 0)
-  const evidence = rawSegments.reduce(
-    (sum, raw) => sum + collapse(stripContactPlaceholders(raw)).length,
-    0,
-  )
+function isMostlyEvidence(segments: readonly Segment[]): boolean {
+  const total = segments.reduce((sum, segment) => sum + segment.text.length, 0)
+  const evidence = segments.reduce((sum, segment) => sum + segment.evidence, 0)
   return evidence >= MIN_QUOTE_LENGTH && evidence * 2 >= total
 }
 
 // A quote is one contiguous span of the resume, or, when it contains "..." or the ellipsis
-// character, several spans in order. The minimum length applies to what is left after
-// normalising, summed over the segments. Either reading of a line-end hyphen may match.
+// character, several spans in order, each substantial and close to the one before. The minimum
+// length applies to what is left after normalising, summed over the segments. Either reading of a
+// line-end hyphen may match.
 export function verifyQuote(quote: string, index: ResumeIndex): boolean {
-  const rawSegments = canonicalise(quote).split(ELLIPSIS)
-  const segments = rawSegments.map(collapse).filter((segment) => segment !== '')
-  if (!isMostlyEvidence(segments, rawSegments)) return false
+  const segments = canonicalise(quote)
+    .split(ELLIPSIS)
+    .map(toSegment)
+    .filter((segment) => segment.text !== '')
+  if (!isMostlyEvidence(segments)) return false
+  if (segments.length > 1 && segments.some((segment) => segment.evidence < MIN_SEGMENT_LENGTH)) {
+    return false
+  }
   return occursInOrder(segments, index.joined) || occursInOrder(segments, index.separated)
 }

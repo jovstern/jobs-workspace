@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest'
 
-import { buildResumeIndex, MIN_QUOTE_LENGTH, normaliseForMatch, verifyQuote } from './quotes'
+import {
+  buildResumeIndex,
+  MAX_SEGMENT_GAP,
+  MIN_QUOTE_LENGTH,
+  MIN_SEGMENT_LENGTH,
+  normaliseForMatch,
+  verifyQuote,
+} from './quotes'
 
 // Short synthetic resume snippets only: invented people, invented employers.
 function accepts(resume: string, quote: string): boolean {
@@ -235,6 +242,60 @@ describe('quotes that are not in the resume', () => {
     })
   })
 
+  describe('word boundaries', () => {
+    const PYTHON = 'Maintained Python scripting for the nightly billing export.'
+
+    test('a quote that starts in the middle of a word', () => {
+      expect(accepts(PYTHON, 'ython scripting for the nightly')).toBe(false)
+    })
+
+    test('a quote that ends in the middle of a word', () => {
+      expect(accepts(PYTHON, 'Maintained Python scripting for the night')).toBe(false)
+    })
+
+    test('the same words on boundaries are accepted', () => {
+      expect(accepts(PYTHON, 'Python scripting for the nightly')).toBe(true)
+    })
+
+    test('a later bounded occurrence is found after an earlier mid-word one', () => {
+      const resume = 'Reactive pipelines first. Then we added React dashboards for the team.'
+
+      expect(accepts(resume, 'React dashboards for the team')).toBe(true)
+      expect(accepts(resume, 'React dashboards for the tea')).toBe(false)
+    })
+  })
+
+  describe('an ellipsis quote', () => {
+    const SCATTERED = [
+      'Built React dashboards for the support team.',
+      'Spent a year on call for the payments service.',
+      'Deployed the checkout service on AWS with Terraform.',
+      'Wrote runbooks and trained new hires on Kubernetes operations.',
+    ].join('\n')
+
+    test('does not verify from single words scattered over the resume', () => {
+      expect(accepts(SCATTERED, 'React ... AWS ... Kubernetes')).toBe(false)
+    })
+
+    test('needs every segment to be at least the segment minimum', () => {
+      expect(MIN_SEGMENT_LENGTH).toBe(8)
+      expect(accepts(SCATTERED, 'Built React dashboards for the ... team')).toBe(false)
+      expect(accepts(SCATTERED, 'Built React dashboards ... for the support team')).toBe(true)
+    })
+
+    test('needs the segments to be close together', () => {
+      expect(MAX_SEGMENT_GAP).toBe(200)
+      const filler = ' Maintained the shared component package.'.repeat(8)
+      const far = `Reduced page weight by forty percent.${filler} Shipped the redesigned checkout flow.`
+      const near = 'Reduced page weight by forty percent. Shipped the redesigned checkout flow.'
+      const quote = 'Reduced page weight by forty percent ... Shipped the redesigned checkout flow'
+
+      expect(far.length).toBeGreaterThan(MAX_SEGMENT_GAP)
+      expect(accepts(far, quote)).toBe(false)
+      expect(accepts(near, quote)).toBe(true)
+    })
+  })
+
   test('an empty string', () => {
     expect(accepts(RESUME, '')).toBe(false)
   })
@@ -250,10 +311,10 @@ describe('the minimum length', () => {
   })
 
   test('counts normalised characters: a quote of 12 is accepted, 11 is not', () => {
-    const resume = 'Wrote parsers for the billing export.'
+    const resume = 'Wrote an API for the billing export.\nWrote a SQL report for the team.'
 
-    expect(accepts(resume, 'Wrote parser')).toBe(true)
-    expect(accepts(resume, 'Wrote parse')).toBe(false)
+    expect(accepts(resume, 'Wrote an API')).toBe(true)
+    expect(accepts(resume, 'Wrote a SQL')).toBe(false)
   })
 
   test('does not count whitespace padding', () => {
