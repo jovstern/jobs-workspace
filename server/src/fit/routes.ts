@@ -4,6 +4,7 @@ import { Router } from 'express'
 import { fitRequestSchema } from '@jobs-workspace/shared'
 
 import type { AiClient } from '../ai/client'
+import type { AiFailureDiagnostic } from '../ai/diagnose'
 import { AppError, parseBody } from '../http/errors'
 import { getJob } from '../jobs/seed'
 import { analyzeFit } from './analyze'
@@ -11,9 +12,17 @@ import { analyzeFit } from './analyze'
 export interface FitRouterDeps {
   ai: AiClient | null
   now: () => number
+  log: (line: string) => void
 }
 
-export function createFitRouter({ ai, now }: FitRouterDeps): Router {
+// The one line written when a model call fails. Both values come from fixed lists (an HTTP status
+// number and a failure category); no message, body, key, prompt or resume text can reach it.
+export function formatFailureLine(diagnostic: AiFailureDiagnostic): string {
+  const status = diagnostic.httpStatus === null ? 'none' : String(diagnostic.httpStatus)
+  return `fit failed status=${status} category=${diagnostic.category}`
+}
+
+export function createFitRouter({ ai, now, log }: FitRouterDeps): Router {
   const router = Router()
 
   router.post('/', express.json({ limit: '256kb' }), async (req, res) => {
@@ -37,6 +46,9 @@ export function createFitRouter({ ai, now }: FitRouterDeps): Router {
         resumeText: body.resumeText,
         signal: controller.signal,
         now,
+        onFailure: (diagnostic) => {
+          log(formatFailureLine(diagnostic))
+        },
       }),
     )
   })

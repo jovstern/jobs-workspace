@@ -3,8 +3,11 @@ import type { AddressInfo } from 'node:net'
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test, vi } from 'vitest'
 
+import { createGeminiClient } from '../ai/client'
 import type { AiClient } from '../ai/client'
 import { createApp } from '../app'
+import { startFakeGemini } from '../test-support/fake-gemini'
+import type { FakeGemini, Scenario } from '../test-support/fake-gemini'
 
 const JOB_ID = 'job-frontend-senior'
 const RESUME_MARKER = 'ZEBRA-MARKER-7731'
@@ -155,4 +158,89 @@ test('the logged path has no query string', async () => {
   expect(harness.lines[0]).toMatch(/^GET \/api\/health 200 \d+ms$/)
   expect(harness.lines[0]).not.toContain('?')
   expect(harness.lines[0]).not.toContain(RESUME_MARKER)
+})
+
+describe('a failed model call', () => {
+  let fake: FakeGemini
+  let failing: Server
+  let failingUrl: string
+  const lines: string[] = []
+  const API_KEY = 'ci-fake-key-for-failures'
+
+  beforeAll(async () => {
+    fake = await startFakeGemini()
+    const ai = createGeminiClient({ apiKey: API_KEY, baseUrl: fake.url })
+    failing = createApp({ ai, log: (line) => lines.push(line), now: () => 0 }).listen(
+      0,
+      '127.0.0.1',
+    )
+    await new Promise((resolve) => failing.once('listening', resolve))
+    failingUrl = `http://127.0.0.1:${String((failing.address() as AddressInfo).port)}`
+  })
+
+  afterAll(async () => {
+    failing.close()
+    await fake.close()
+  })
+
+  beforeEach(() => {
+    lines.length = 0
+    fake.reset()
+    for (const spy of Object.values(consoleSpies)) spy.mockClear()
+  })
+
+  async function postFailing(scenario: Scenario): Promise<{ status: number; text: string }> {
+    fake.setScenario(scenario)
+    const response = await fetch(`${failingUrl}/api/fit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobId: JOB_ID, resumeText: RESUME }),
+    })
+    const text = await response.text()
+    await settled()
+    return { status: response.status, text }
+  }
+
+  test.each([
+    ['http_429', 'fit failed status=429 category=RESOURCE_EXHAUSTED'],
+    ['http_503', 'fit failed status=503 category=UNAVAILABLE'],
+    ['blocked', 'fit failed status=none category=blocked'],
+    ['truncated', 'fit failed status=none category=unfinished'],
+    ['garbage', 'fit failed status=none category=invalid_json'],
+  ] as const)(
+    '%s writes one status-and-category line, then the request line',
+    async (scenario, expected) => {
+      const { status, text } = await postFailing(scenario)
+
+      expect(status).toBe(502)
+      expect(JSON.parse(text)).toMatchObject({ error: { code: 'ai_failed', retryable: true } })
+      expect(lines).toHaveLength(2)
+      expect(lines[0]).toBe(expected)
+      expect(lines[1]).toMatch(/^POST \/api\/fit 502 \d+ms$/)
+    },
+  )
+
+  test('the failure line carries no key, resume text, prompt or error message', async () => {
+    for (const scenario of ['http_429', 'http_503', 'blocked'] as const) {
+      await postFailing(scenario)
+    }
+
+    const everything = `${lines.join('\n')}\n${consoleText()}`
+    expect(everything).not.toContain(API_KEY)
+    expect(everything).not.toContain(RESUME_MARKER)
+    expect(everything).not.toContain('Quota exceeded')
+    expect(everything).not.toContain('overloaded')
+    expect(everything).not.toContain('PROHIBITED_CONTENT')
+    for (const line of lines.filter((candidate) => candidate.startsWith('fit failed'))) {
+      expect(line).toMatch(/^fit failed status=(?:\d{3}|none) category=[A-Za-z_]+$/)
+    }
+  })
+
+  test('a successful call writes no failure line', async () => {
+    const { status } = await postFailing('ok')
+
+    expect(status).toBe(200)
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toMatch(/^POST \/api\/fit 200 \d+ms$/)
+  })
 })

@@ -47,7 +47,7 @@ export function createApp(deps: Partial<AppDeps> = {}) {
   if (deps.rateLimit) {
     app.use('/api/fit', createRateLimiter({ ...deps.rateLimit, now }))
   }
-  app.use('/api/fit', createFitRouter({ ai, now }))
+  app.use('/api/fit', createFitRouter({ ai, now, log }))
 
   app.use(notFoundHandler)
   app.use(errorHandler)
