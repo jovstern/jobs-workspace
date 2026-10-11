@@ -5,3 +5,4 @@ test-results
 package-lock.json
 .claude
 .planning
+.gsd
