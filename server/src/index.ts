@@ -17,6 +17,7 @@ const ai =
 createApp({
   ai,
   env,
+  rateLimit: { windowMs: 60_000, max: 20 },
   log: (line) => {
     console.log(line)
   },
