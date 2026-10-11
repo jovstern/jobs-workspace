@@ -1,4 +1,4 @@
-import { computeFit } from '@jobs-workspace/shared'
+import { computeFit, indexRatingsFirstWins } from '@jobs-workspace/shared'
 import type { Band, Job, Rating, Requirement, StoredAnalysis } from '@jobs-workspace/shared'
 
 // A requirement joined with its stored rating, ready to show.
@@ -36,7 +36,7 @@ export function selectCurrentAnalysis(
 
 // Derived on every call: the score is computed from the stored ratings and never stored.
 export function buildFitView(job: Job, analysis: StoredAnalysis): FitView {
-  const ratingById = new Map(analysis.ratings.map((rating) => [rating.requirementId, rating]))
+  const ratingById = indexRatingsFirstWins(analysis.ratings)
 
   const items: RatedItem[] = job.requirements.map((requirement) => {
     const stored = ratingById.get(requirement.id)

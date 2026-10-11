@@ -128,4 +128,43 @@ describe('buildFitView', () => {
     expect(view.score).toBe(46)
     expect(view.band).toBe('Stretch')
   })
+
+  describe('duplicate rating rows in stored data', () => {
+    const duplicated = analysis({
+      ratings: [
+        {
+          requirementId: 'r1',
+          rating: 'met',
+          quote: 'first',
+          rationale: 'A.',
+          quoteRejected: false,
+        },
+        {
+          requirementId: 'r1',
+          rating: 'not_evidenced',
+          quote: null,
+          rationale: 'B.',
+          quoteRejected: false,
+        },
+        { requirementId: 'r2', rating: 'met', quote: 'two', rationale: 'C.', quoteRejected: false },
+      ],
+    })
+
+    test('the first row for an id is the one shown', () => {
+      const view = buildFitView(JOB, duplicated)
+
+      expect(view.required[0]).toMatchObject({ rating: 'met', quote: 'first', rationale: 'A.' })
+    })
+
+    test('the displayed ratings and the computed score use the same row', () => {
+      const view = buildFitView(JOB, duplicated)
+
+      // r1 and r2 are met (first row wins), r3 and r4 have no row, no nice-to-have is met:
+      // 100 x 0.5 x 0.9 = 45.
+      const metShown = view.required.filter((item) => item.rating === 'met').length
+      expect(metShown).toBe(2)
+      expect(view.requiredMet).toBe(metShown)
+      expect(view).toMatchObject({ score: 45, band: 'Stretch' })
+    })
+  })
 })

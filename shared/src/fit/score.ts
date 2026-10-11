@@ -19,6 +19,20 @@ interface ComputeFitInput {
   ratings: readonly { requirementId: string; rating: Rating }[]
 }
 
+// Indexes ratings by requirement id. When an id appears more than once the first row wins, the
+// same rule the server uses when it reconciles the model's answer with the job. Stored data is
+// untrusted and may hold duplicates, so everything that reads a rating for a requirement, the
+// score and the rows on screen alike, goes through this one function and cannot disagree.
+export function indexRatingsFirstWins<T extends { requirementId: string }>(
+  ratings: readonly T[],
+): Map<string, T> {
+  const byId = new Map<string, T>()
+  for (const item of ratings) {
+    if (!byId.has(item.requirementId)) byId.set(item.requirementId, item)
+  }
+  return byId
+}
+
 // Thresholds are inclusive lower bounds: 80, 60 and 40 land in the higher band (D-11).
 export function bandFor(score: number): Band {
   if (score >= 80) return 'Strong fit'
@@ -37,13 +51,10 @@ function average(credits: readonly number[]): number {
 // nice-to-have average adds at most 10 percent on top and cannot lift a job with no required
 // credit above 0. The order of operations matters: it decides rounding at the boundaries.
 export function computeFit({ requirements, ratings }: ComputeFitInput): FitScore {
-  const ratingById = new Map<string, Rating>()
-  for (const item of ratings) {
-    if (!ratingById.has(item.requirementId)) ratingById.set(item.requirementId, item.rating)
-  }
+  const ratingById = indexRatingsFirstWins(ratings)
 
   const ratingOf = (requirement: Requirement): Rating =>
-    ratingById.get(requirement.id) ?? 'not_evidenced'
+    ratingById.get(requirement.id)?.rating ?? 'not_evidenced'
 
   const required = requirements.filter((requirement) => requirement.kind === 'required')
   const niceToHave = requirements.filter((requirement) => requirement.kind === 'nice_to_have')

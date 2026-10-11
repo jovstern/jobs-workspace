@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest'
 
 import type { Rating } from '../fit'
 import type { Requirement } from '../job'
-import { BANDS, CREDIT, bandFor, computeFit } from './score'
+import { BANDS, CREDIT, bandFor, computeFit, indexRatingsFirstWins } from './score'
 
 function requirement(id: string, kind: Requirement['kind']): Requirement {
   return { id, text: `Requirement ${id}`, kind, skill: 'React' }
@@ -195,5 +195,21 @@ describe('computeFit edge cases', () => {
     const result = score([M, M, P, N, M, N], [M, M, M])
     expect(result.requiredMet).toBe(3)
     expect(result.requiredTotal).toBe(6)
+  })
+})
+
+describe('indexRatingsFirstWins', () => {
+  test('keeps the first row for a repeated id and every other id', () => {
+    const rows = [
+      { requirementId: 'a', rating: 'met' },
+      { requirementId: 'b', rating: 'partial' },
+      { requirementId: 'a', rating: 'not_evidenced' },
+    ]
+
+    const indexed = indexRatingsFirstWins(rows)
+
+    expect([...indexed.keys()]).toEqual(['a', 'b'])
+    expect(indexed.get('a')).toBe(rows[0])
+    expect(indexed.get('b')).toBe(rows[1])
   })
 })
