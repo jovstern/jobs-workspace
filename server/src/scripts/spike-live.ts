@@ -3,7 +3,10 @@
 //
 //   npm --prefix server run spike:live -- --check-config   prints whether a key is configured
 //   npm --prefix server run spike:live -- --dry-run        rehearses against the stand-in, no key
-//   npm --prefix server run spike:live                      LIVE: paid calls, run it by hand, once
+//   npm --prefix server run spike:live -- --live            LIVE: paid calls, run it by hand, once
+//
+// With no option it prints this usage and exits without sending anything: a paid run needs the
+// explicit --live flag.
 //
 // It is not part of `npm run check`, the server check or the browser tests, and no gate runs it.
 // It sends only the committed synthetic resume, makes at most REQUEST_CAP requests and never
@@ -382,10 +385,18 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
 
 export type SpikeMode = 'check-config' | 'dry-run' | 'live'
 
-// Only the two known flags are accepted. A typo must never fall through into a paid run.
+export const USAGE = [
+  'usage: npm --prefix server run spike:live -- <option>',
+  '  --live          paid calls to Google, run it by hand, once',
+  '  --dry-run       rehearse against the stand-in, no key, nothing sent',
+  '  --check-config  print whether a key is configured',
+].join('\n')
+
+// Only the three known flags are accepted, one at a time. No flag and a typo both return null, so
+// neither can fall through into a paid run: a live run is always an explicit --live.
 export function parseMode(args: readonly string[]): SpikeMode | null {
-  if (args.length === 0) return 'live'
   const [only] = args
+  if (args.length === 1 && only === '--live') return 'live'
   if (args.length === 1 && only === '--check-config') return 'check-config'
   if (args.length === 1 && only === '--dry-run') return 'dry-run'
   return null
@@ -426,9 +437,7 @@ function progress(line: string): void {
 async function main(): Promise<void> {
   const mode = parseMode(process.argv.slice(2))
   if (mode === null) {
-    console.error(
-      'refused: unknown option (use --check-config or --dry-run, or none for a live run)',
-    )
+    console.error(USAGE)
     process.exitCode = 2
     return
   }

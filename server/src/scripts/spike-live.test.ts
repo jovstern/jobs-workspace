@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -130,12 +131,51 @@ describe('runSpike against the stand-in model', () => {
 })
 
 describe('modes and refusals', () => {
-  test('parseMode accepts only the two flags, and a bare run is live', () => {
-    expect(parseMode([])).toBe('live')
+  test('parseMode accepts only the three flags, and a live run needs --live', () => {
+    expect(parseMode(['--live'])).toBe('live')
     expect(parseMode(['--check-config'])).toBe('check-config')
     expect(parseMode(['--dry-run'])).toBe('dry-run')
+    expect(parseMode([])).toBeNull()
     expect(parseMode(['--dryrun'])).toBeNull()
+    expect(parseMode(['live'])).toBeNull()
     expect(parseMode(['--dry-run', '--check-config'])).toBeNull()
+    expect(parseMode(['--live', '--dry-run'])).toBeNull()
+  })
+
+  describe('the script itself', () => {
+    const script = fileURLToPath(new URL('./spike-live.ts', import.meta.url))
+
+    // Runs the real entry point. Only argument sets that must stop before any environment is read
+    // are run, so nothing here can reach Google. The stand-in is the only base URL and no key is
+    // given.
+    function run(args: readonly string[]) {
+      return spawnSync(process.execPath, ['--import', 'tsx', script, ...args], {
+        encoding: 'utf8',
+        env: { PATH: process.env.PATH ?? '', GEMINI_BASE_URL: fake.url },
+      })
+    }
+
+    test('with no argument it prints usage, exits non-zero and sends nothing', () => {
+      const before = fake.requestCount()
+
+      const result = run([])
+
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('usage:')
+      expect(result.stderr).toContain('--live')
+      expect(result.stdout).toBe('')
+      expect(fake.requestCount() - before).toBe(0)
+    })
+
+    test('with an unknown argument it does the same', () => {
+      const before = fake.requestCount()
+
+      const result = run(['--liv'])
+
+      expect(result.status).toBe(2)
+      expect(result.stderr).toContain('usage:')
+      expect(fake.requestCount() - before).toBe(0)
+    })
   })
 
   test('configLine is a single boolean line', () => {
