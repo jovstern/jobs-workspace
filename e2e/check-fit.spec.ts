@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import { expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 // Synthetic resume: a fictional person. Every contact detail in it is invented (example.com, the
 // 555 01xx phone range, a street that does not exist) and is removed before anything is saved.
@@ -8,6 +9,18 @@ const RESUME = readFileSync(
   new URL('./fixtures/resumes/frontend-senior.txt', import.meta.url),
   'utf8',
 )
+
+// The stand-in model's control endpoints (port 3199). Only the fake-only tests below use them.
+const STAND_IN = 'http://127.0.0.1:3199'
+const BANDS = /^(Strong fit|Good fit|Stretch|Long shot)$/
+
+async function saveResume(page: Page) {
+  await page.goto('/')
+  await page.getByLabel('Paste your resume text').fill(RESUME)
+  await page.getByRole('button', { name: 'Review text' }).click()
+  await page.getByRole('button', { name: 'Save resume' }).click()
+  await expect(page.getByText('Resume saved.', { exact: true })).toBeAttached()
+}
 
 test('main flow: paste resume, remove contact details, check fit, refresh keeps both', async ({
   page,
@@ -50,10 +63,22 @@ test('main flow: paste resume, remove contact details, check fit, refresh keeps 
   expect(sent).not.toContain('example.com')
   expect(sent).not.toContain('555 0142')
 
-  const ratings = page.getByRole('list', { name: 'Rated requirements' })
-  await expect(ratings.getByRole('listitem')).toHaveCount(8)
-  await expect(ratings.getByText('Met', { exact: true }).first()).toBeVisible()
-  await expect(ratings.getByText('From your resume:').first()).toBeVisible()
+  const required = page.getByRole('list', { name: 'Required', exact: true })
+  const niceToHave = page.getByRole('list', { name: 'Nice to have', exact: true })
+  await expect(required.getByRole('listitem')).toHaveCount(6)
+  await expect(niceToHave.getByRole('listitem')).toHaveCount(2)
+  await expect(required.getByText('Met', { exact: true }).first()).toBeVisible()
+  await expect(required.getByText('From your resume:').first()).toBeVisible()
+
+  // The score and band are computed in the browser from the ratings: assert the shape, not the
+  // numbers, so the same test also runs against the real model.
+  const percentage = page.getByText(/^\d{1,3}%$/)
+  await expect(percentage).toBeVisible()
+  await expect(page.getByText(BANDS)).toBeVisible()
+  await expect(page.getByText('Fit estimate', { exact: true })).toBeVisible()
+  await expect(page.getByText(/^\d+ of 6 required requirements met$/)).toBeVisible()
+  await expect(page.getByText(/not a verdict on whether to apply/)).toBeVisible()
+  const scoreText = await percentage.innerText()
   expect(fitRequests).toBe(1)
 
   const stored = await page.evaluate(() => window.localStorage.getItem('jw:analyses'))
@@ -79,8 +104,75 @@ test('main flow: paste resume, remove contact details, check fit, refresh keeps 
 
   await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
 
-  await expect(ratings.getByRole('listitem')).toHaveCount(8)
+  // The stored result appears at once, with the same score, and no new request was made.
+  await expect(required.getByRole('listitem')).toHaveCount(6)
+  await expect(niceToHave.getByRole('listitem')).toHaveCount(2)
+  await expect(page.getByText(/^\d{1,3}%$/)).toHaveText(scoreText)
   expect(fitRequests).toBe(1)
+})
+
+// These tests need the stand-in model: they pin exact outcomes and switch scenarios. Every fit
+// call in this file runs serially, which also keeps it under the server's rate limit.
+test.describe('with the stand-in model', () => {
+  test.afterEach(async ({ request }) => {
+    await request.post(`${STAND_IN}/__reset`)
+  })
+
+  test('a strong match and a poor match get their bands @fake-only', async ({ page }) => {
+    await saveResume(page)
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    await expect(page.getByText('Strong fit', { exact: true })).toBeVisible()
+    await expect(page.getByText('6 of 6 required requirements met')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    await expect(page.getByText('Long shot', { exact: true })).toBeVisible()
+  })
+
+  test('a quote the resume does not contain is shown as not evidenced @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'hallucinated_quote' } })
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    await expect(
+      page.getByText(
+        'The AI cited text we could not find in your resume, so this was marked not evidenced.',
+      ),
+    ).toHaveCount(1)
+  })
+
+  test('a failed check can be retried with one click, and each click is one request @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+    await request.post(`${STAND_IN}/__reset`)
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'http_503' } })
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText('Something went wrong on our side. Try again.')
+    await expect(alert.getByRole('button', { name: 'Try again' })).toBeVisible()
+
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'ok' } })
+    await alert.getByRole('button', { name: 'Try again' }).click()
+
+    await expect(page.getByText(BANDS)).toBeVisible()
+    await expect(alert).toHaveCount(0)
+    const count = await request.get(`${STAND_IN}/__count`)
+    expect(await count.json()).toEqual({ generateContent: 2 })
+  })
 })
 
 test('a paste that is too short is refused and saves nothing, even after a reload', async ({
