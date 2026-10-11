@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Completed 01-07-PLAN.md
-last_updated: "2026-10-11T08:17:04.130Z"
+stopped_at: Completed 01-08-PLAN.md
+last_updated: "2026-10-11T08:24:20.726Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 8eda207c0b29d3b233495644bca0aa1ad15c7368
+state_head: e8494c40eb2007640a00ac0cb493de4ebf342010
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01 (Real AI path, end to end) — EXECUTING
-Plan: 8 of 11
+Plan: 9 of 11
 Status: Ready to execute
 Last activity: 2026-10-11 — Phase 01 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P05 | 34 min | 2 tasks | 15 files |
 | Phase 01 P06 | 6 min | 3 tasks | 11 files |
 | Phase 01 P07 | 9 min | 3 tasks | 11 files |
+| Phase 01 P08 | 15 min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-06: rate limiter hand-written (D-19), no dependency; origin guard runs before the limiter so refused foreign requests use no quota
 - [Phase 01]: 01-06: content-type rule covers every method except GET, HEAD, OPTIONS; non-JSON fit POST now answers 415
 - [Phase 01]: 01-07: the 12 character quote minimum applies to normalised ellipsis segments summed; a withdrawn rating loses its rationale as well as its quote
+- [Phase 01]: 01-08: approved skill-file change applied; greeting form deleted and the Forms rule names src/features/resume/PasteForm.tsx
+- [Phase 01]: 01-08: buildResumeRecord is the only constructor of a stored resume, so nothing is saved or sent without contact removal; the saved announcement fills only after a save in the current session
 
 ### Pending Todos
 
@@ -118,6 +121,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T08:17:04.107Z
-Stopped at: Completed 01-07-PLAN.md
+Last session: 2026-10-11T08:24:20.701Z
+Stopped at: Completed 01-08-PLAN.md
 Resume file: None

@@ -71,7 +71,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 ### Resume
 
 - [ ] **RES-01**: User can provide a resume by uploading a PDF
-- [ ] **RES-02**: User can provide a resume by pasting text
+- [x] **RES-02**: User can provide a resume by pasting text
 - [ ] **RES-03**: User can review and edit the extracted resume content and the structured profile (skills, roles, experience) before it is used
 - [ ] **RES-04**: User can replace or delete their resume at any time
 - [ ] **RES-05**: User is asked for a resume at the moment they first need it (checking fit or chatting), not as a wall before using the page
@@ -210,7 +210,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | PIPE-07 | Phase 5 | Pending |
 | PIPE-08 | Phase 5 | Pending |
 | RES-01 | Phase 01.2 | Pending |
-| RES-02 | Phase 1 | Pending |
+| RES-02 | Phase 1 | Complete |
 | RES-03 | Phase 01.2 | Pending |
 | RES-04 | Phase 01.2 | Pending |
 | RES-05 | Phase 01.2 | Pending |
