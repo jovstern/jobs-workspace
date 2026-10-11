@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 
-import { redactContactDetails } from './redact'
+import { CONTACT_PLACEHOLDERS, redactContactDetails, stripContactPlaceholders } from './redact'
 
 type Kind = 'email' | 'phone' | 'address' | 'link'
 
@@ -118,6 +118,23 @@ describe('what must stay', () => {
     ].join('\n')
 
     expect(redactContactDetails(text)).toEqual({ text, counts: zeroCounts() })
+  })
+})
+
+describe('placeholders', () => {
+  test('the exported list holds the four placeholders the redactor writes', () => {
+    expect([...CONTACT_PLACEHOLDERS].sort()).toEqual(Object.values(PLACEHOLDER).sort())
+  })
+
+  test('stripContactPlaceholders removes each of them, with or without brackets', () => {
+    expect(
+      stripContactPlaceholders(
+        'a [email removed] b [phone removed] c address removed d [link removed]',
+      )
+        .trim()
+        .split(/\s+/)
+        .join(' '),
+    ).toBe('a b c d')
   })
 })
 

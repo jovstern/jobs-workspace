@@ -28,6 +28,26 @@ const PHONE_PLACEHOLDER = '[phone removed]'
 const ADDRESS_PLACEHOLDER = '[address removed]'
 const LINK_PLACEHOLDER = '[link removed]'
 
+// Every placeholder this module can write. Other code that must tell removed text from real text
+// (quote checking) reads this list, so a new kind cannot be forgotten there.
+export const CONTACT_PLACEHOLDERS: readonly string[] = [
+  EMAIL_PLACEHOLDER,
+  PHONE_PLACEHOLDER,
+  ADDRESS_PLACEHOLDER,
+  LINK_PLACEHOLDER,
+]
+
+// The placeholder words without their brackets, so "email removed" is caught as well.
+const PLACEHOLDER_ANY = new RegExp(
+  CONTACT_PLACEHOLDERS.map((placeholder) => `\\[?${placeholder.slice(1, -1)}\\]?`).join('|'),
+  'gi',
+)
+
+// Replaces every placeholder with a space. What is left is the text that was really in the resume.
+export function stripContactPlaceholders(text: string): string {
+  return text.replace(PLACEHOLDER_ANY, ' ')
+}
+
 // A phone number needs at least this many digits; dates, versions and salary ranges have fewer.
 const MIN_PLUS_PHONE_DIGITS = 8
 

@@ -6,7 +6,10 @@
 // bullets, smart quotes, dash variants, line breaks, hyphenation) do not turn real evidence into
 // a rejected quote, while a paraphrase or an invented sentence still fails.
 
-// A quote shorter than this, once normalised, is too small to count as evidence.
+import { stripContactPlaceholders } from '@jobs-workspace/shared'
+
+// A quote shorter than this, once normalised and with any contact-removal placeholders taken out,
+// is too small to count as evidence.
 export const MIN_QUOTE_LENGTH = 12
 
 export interface ResumeIndex {
@@ -84,15 +87,24 @@ function occursInOrder(segments: readonly string[], text: string): boolean {
   return true
 }
 
+// A placeholder such as "[email removed]" stands where the resume held contact details. It is in
+// the text that was sent, so it can be matched, but it says nothing about the person's work. It
+// does not count towards the minimum length, and it may not make up more than half of a quote.
+function isMostlyEvidence(segments: readonly string[], rawSegments: readonly string[]): boolean {
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0)
+  const evidence = rawSegments.reduce(
+    (sum, raw) => sum + collapse(stripContactPlaceholders(raw)).length,
+    0,
+  )
+  return evidence >= MIN_QUOTE_LENGTH && evidence * 2 >= total
+}
+
 // A quote is one contiguous span of the resume, or, when it contains "..." or the ellipsis
 // character, several spans in order. The minimum length applies to what is left after
 // normalising, summed over the segments. Either reading of a line-end hyphen may match.
 export function verifyQuote(quote: string, index: ResumeIndex): boolean {
-  const segments = canonicalise(quote)
-    .split(ELLIPSIS)
-    .map(collapse)
-    .filter((segment) => segment !== '')
-  const length = segments.reduce((total, segment) => total + segment.length, 0)
-  if (length < MIN_QUOTE_LENGTH) return false
+  const rawSegments = canonicalise(quote).split(ELLIPSIS)
+  const segments = rawSegments.map(collapse).filter((segment) => segment !== '')
+  if (!isMostlyEvidence(segments, rawSegments)) return false
   return occursInOrder(segments, index.joined) || occursInOrder(segments, index.separated)
 }

@@ -204,6 +204,37 @@ describe('quotes that are not in the resume', () => {
     ).toBe(false)
   })
 
+  describe('a placeholder left by contact removal', () => {
+    const REDACTED = [
+      'Dana Example, Backend Engineer',
+      '[email removed] | [phone removed] | [link removed]',
+      '[address removed]',
+      'Built payment services in Node.js for a retailer.',
+    ].join('\n')
+
+    test.each(['[email removed]', '[phone removed]', '[address removed]', '[link removed]'])(
+      '%s alone is not evidence',
+      (placeholder) => {
+        expect(accepts(REDACTED, placeholder)).toBe(false)
+      },
+    )
+
+    test('the placeholder words without brackets are not evidence either', () => {
+      expect(accepts(REDACTED, 'email removed phone removed link removed')).toBe(false)
+    })
+
+    test('several placeholders together are not evidence', () => {
+      expect(accepts(REDACTED, '[email removed] | [phone removed] | [link removed]')).toBe(false)
+    })
+
+    test('a placeholder with a few words of text is not evidence', () => {
+      expect(accepts(REDACTED, 'Contact: [email removed]')).toBe(false)
+      expect(
+        accepts(REDACTED, 'Backend Engineer [email removed] | [phone removed] | [link removed]'),
+      ).toBe(false)
+    })
+  })
+
   test('an empty string', () => {
     expect(accepts(RESUME, '')).toBe(false)
   })
