@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { MODELS } from '../config/models'
 import type { AiTask, ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
-import type { AiFailureDiagnostic } from './diagnose'
+import { diagnoseError } from './diagnose'
+import type { AiFailureDiagnostic, FailureCategory } from './diagnose'
 import { toGeminiSchema } from './schema'
 
 export interface AiUsage {
@@ -61,6 +62,13 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
     const deadlineMs = request.overrides?.deadlineMs ?? model.deadlineMs
     const startedAt = Date.now()
 
+    // Reports why a call failed, as a status and a category only, and ends it with the one typed
+    // error the route layer knows. Nothing about the failure itself is kept.
+    function reject(category: FailureCategory): never {
+      request.onFailure?.({ httpStatus: null, category, errorClass: null })
+      throw new AppError('ai_failed')
+    }
+
     try {
       // generateContent only, with no optional extras: nothing is stored at the provider, no
       // tool can run, and a failed call is never retried behind the user's back.
@@ -93,18 +101,19 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
       }
 
       // A blocked, truncated or empty answer arrives as HTTP 200, so success is never assumed.
-      if (response.promptFeedback?.blockReason !== undefined) throw new AppError('ai_failed')
-      if (finishReason !== FinishReason.STOP) throw new AppError('ai_failed')
+      if (response.promptFeedback?.blockReason !== undefined) reject('blocked')
+      if (finishReason !== FinishReason.STOP) reject('unfinished')
       const text = response.text
-      if (text === undefined || text.trim() === '') throw new AppError('ai_failed')
+      if (text === undefined || text.trim() === '') reject('empty_text')
 
       const parsed = request.schema.safeParse(JSON.parse(text))
-      if (!parsed.success) throw new AppError('ai_failed')
+      if (!parsed.success) reject('schema_mismatch')
       return parsed.data
     } catch (error) {
       // ApiError, aborts (client gone or deadline), network failures and unparseable JSON all
       // end here. Nothing about the failure is kept: it could echo prompt or model text.
       if (error instanceof AppError) throw error
+      request.onFailure?.(diagnoseError(error))
       throw new AppError('ai_failed')
     }
   }

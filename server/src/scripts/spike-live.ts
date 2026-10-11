@@ -134,6 +134,15 @@ function thoughtPlusOutput(usage: AiUsage): number {
   return usage.thoughtTokens + usage.outputTokens
 }
 
+// A failed call in a progress line: the typed code, then the status and category when known.
+function failureText(row: CallRow): string {
+  const code = row.errorCode ?? 'failed'
+  if (row.failure === null) return code
+  const status = row.failure.httpStatus === null ? 'no-http-status' : String(row.failure.httpStatus)
+  const errorClass = row.failure.errorClass === null ? '' : ` ${row.failure.errorClass}`
+  return `${code} ${status} ${row.failure.category}${errorClass}`
+}
+
 function pairOf(name: PairName) {
   const found = PAIRS.find((pair) => pair.name === name)
   if (found === undefined) throw new Error('unknown pair')
@@ -197,6 +206,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
     const job = getJob(pairOf(pairName).jobId)
     if (job === undefined) throw new Error('seed job missing')
     let usage: AiUsage | null = null
+    let failure: AiFailureDiagnostic | null = null
     const startedAt = performance.now()
     let record: CallRecord
     try {
@@ -213,6 +223,9 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
         },
         onUsage: (reported) => {
           usage = reported
+        },
+        onFailure: (reported) => {
+          failure = reported
         },
       })
       const kindOf = new Map(
@@ -243,7 +256,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
           pair: pairName,
           ok: false,
           errorCode: error instanceof AppError ? error.code : 'unexpected_error',
-          failure: null,
+          failure,
           wallMs: Math.round(performance.now() - startedAt),
           usage,
           requiredMet: null,
@@ -255,7 +268,7 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
     records.push(record)
     log(
       `[${String(records.length)}/${String(requestCap)}] ${level} ${pairName} ${
-        record.row.ok ? 'ok' : (record.row.errorCode ?? 'failed')
+        record.row.ok ? 'ok' : failureText(record.row)
       } ${String(record.row.wallMs)}ms`,
     )
   }

@@ -112,7 +112,7 @@ describe('runSpike against the stand-in model', () => {
       log: (line) => lines.push(line),
     })
     for (const row of summary.rows) {
-      expect(row.failure).toEqual({ httpStatus: 429, category: 'RESOURCE_EXHAUSTED' })
+      expect(row.failure).toMatchObject({ httpStatus: 429, category: 'RESOURCE_EXHAUSTED' })
     }
     expect(lines[0]).toContain('429')
     expect(lines[0]).toContain('RESOURCE_EXHAUSTED')

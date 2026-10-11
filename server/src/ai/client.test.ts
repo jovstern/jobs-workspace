@@ -43,7 +43,9 @@ describe('failure diagnostics', () => {
   test('a provider HTTP error reports its status and category and still throws the typed error', async () => {
     const seen: AiFailureDiagnostic[] = []
     const outcome = await callWith((d) => seen.push(d))
-    expect(seen).toEqual([{ httpStatus: 400, category: 'INVALID_ARGUMENT' }])
+    expect(seen).toMatchObject([
+      { httpStatus: 400, category: 'INVALID_ARGUMENT', errorClass: 'ApiError' },
+    ])
     expect(outcome.ok).toBe(false)
     if (outcome.ok) return
     expect(outcome.error).toMatchObject({ name: 'AppError', code: 'ai_failed' })
@@ -62,7 +64,7 @@ describe('failure diagnostics', () => {
     fake.setScenario(scenario)
     const seen: AiFailureDiagnostic[] = []
     await callWith((d) => seen.push(d))
-    expect(seen).toEqual([expected])
+    expect(seen).toMatchObject([expected])
   })
 
   test('the diagnostic never holds the provider message', async () => {
