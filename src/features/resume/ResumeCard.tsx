@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 
 import { Card } from '../../components/Card'
 import { PasteForm } from './PasteForm'
+import { PrivacyNote } from './PrivacyNote'
 import { useResumeStore } from './resume-store'
 
 const HEADING = 'text-xl leading-[1.2] font-semibold text-gray-900'
@@ -39,6 +40,9 @@ export function ResumeCard() {
           Resume saved. {resume.text.length} characters.
         </p>
       )}
+      <div className="mt-6 border-t border-gray-200 pt-6">
+        <PrivacyNote />
+      </div>
     </Card>
   )
 }
