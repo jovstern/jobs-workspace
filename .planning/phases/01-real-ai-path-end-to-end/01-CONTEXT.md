@@ -143,6 +143,18 @@ authority on which part belongs to which phase.
 - **D-19:** AI routes get a **small hand-written rate limiter** on the server (no new
   dependency). Do not add `express-rate-limit`.
 
+### Plan approval record (user, 2026-10-11)
+- **D-20:** The user **approved the Phase 1 plan** (plans 01-01 to 01-11) and **every "Needs
+  approval" item** in plan 01-01's "Dependencies and configuration changes" section: `zustand`
+  5.0.15; `@google/genai` 2.28.0 pinned exactly (the blocking registry check in 01-01 Task 1 still
+  applies); the `fake-gemini` and `spike:live` scripts in `server/package.json`; the `/api` proxy
+  in `vite.config.ts`; the `playwright.config.ts` webServer array with the `REAL_AI` switch; the
+  new `server/.env.example`; and the one-path edit in
+  `.claude/skills/stack-conventions/SKILL.md` (the user chose "update the path": delete the
+  greeting form and point the Forms rule at `src/features/resume/PasteForm.tsx`).
+- **Not covered by this approval, still asked at the time:** the go-ahead for the paid live spike
+  (01-09 Task 2), the billing decision (01-11 Task 1), and any real-model run of the demo test.
+
 ### Carried forward (already decided, do not re-ask)
 - Each requirement is rated met / partial / not evidenced, with a supporting resume quote for
   met and partial; quotes are verified against the resume text.
