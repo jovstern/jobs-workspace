@@ -43,9 +43,11 @@ async function start(): Promise<Harness> {
       calls += 1
       const ratings = REQUIREMENT_IDS.map((requirementId) => ({
         requirementId,
-        rating: 'met',
+        // Not evidenced keeps its rationale; a met rating with no quote would be withdrawn (and
+        // its rationale dropped) by the quote check, which is not what this test is about.
+        rating: 'not_evidenced',
         quote: null,
-        rationale: `Evidence found. ${MODEL_MARKER}`,
+        rationale: `No evidence found. ${MODEL_MARKER}`,
       }))
       return Promise.resolve(request.schema.parse({ ratings }))
     },
