@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 01
 current_phase_name: Real AI path, end to end
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-10-11T07:05:26.359Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-10-11T07:18:39.571Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 01 execution started
-state_head: 085320d9aeda48271e3ede68f0db0d843062ca32
+state_head: d777edf5d6860015a6ff5dbc563acaa82d58311b
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 11
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01 (Real AI path, end to end) — EXECUTING
-Plan: 3 of 11
+Plan: 4 of 11
 Status: Ready to execute
 Last activity: 2026-10-11 — Phase 01 execution started
 
@@ -58,6 +58,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01 P01 | 3min | 3 tasks | 13 files |
 | Phase 01 P02 | 8 min | 2 tasks | 13 files |
+| Phase 01 P03 | 25 min | 2 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-01: tsconfig include for shared applied in the Task 2 commit because the pre-commit lint could not parse shared/ without it
 - [Phase 01]: Seed job id job-frontend-senior and requirement ids fe-sr-r1 to fe-sr-r8 are final; AiClient keeps the provider inside server/src/ai and model ids live only in config/models.ts
 - [Phase 01]: createApp reads only ai and now from its deps; env and log are typed in AppDeps but consumed by plan 01-06
+- [Phase 01]: Plan 01-03: browser-test preview server never reuses an existing server (reuseExistingServer false) so a stale preview cannot proxy to a developer's API
+- [Phase 01]: Plan 01-03: FitPanel shows the server's fixed per-code error message; Try again is hidden for non-retryable errors
 
 ### Pending Todos
 
@@ -103,6 +106,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T07:05:21.848Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-10-11T07:18:39.551Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None
