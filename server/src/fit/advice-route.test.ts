@@ -7,8 +7,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 
 import { createApp } from '../app'
 import { createGeminiClient } from '../ai/client'
+import { prepareResumeForModel } from '../ai/prepare'
 import { startFakeGemini } from '../test-support/fake-gemini'
 import type { FakeGemini } from '../test-support/fake-gemini'
+
+import { containsLink } from './advice-text'
+import { buildResumeIndex, normaliseForMatch, occursAsPhrase, verifyQuote } from './quotes'
 
 const JOB_ID = 'job-frontend-senior'
 
@@ -97,5 +101,48 @@ describe('defective plans through the real SDK, the stand-in and the route', () 
     const plan = body.advice?.plans.find((entry) => entry.requirementId === firstGap?.requirementId)
     expect(plan?.steps).toHaveLength(4)
     expect(plan?.whyItMatters).not.toBe('A second plan for the same requirement.')
+  })
+})
+
+describe('tailoring through the real SDK, the stand-in and the route', () => {
+  const index = buildResumeIndex(prepareResumeForModel(RESUME_A))
+  const resumeUses = (word: string) => {
+    const phrase = normaliseForMatch(word)
+    return occursAsPhrase(index.joined, phrase) || occursAsPhrase(index.separated, phrase)
+  }
+
+  test('a clean answer gives tailoring in which every tip quote is in the resume', async () => {
+    const { advice } = await fit('ok')
+
+    expect(advice?.tailoring).not.toBeNull()
+    const tailoring = advice?.tailoring
+    expect(tailoring?.emphasise.length).toBeGreaterThan(0)
+    expect(tailoring?.emphasise.length).toBeLessThanOrEqual(5)
+    for (const entry of tailoring?.emphasise ?? []) {
+      expect(verifyQuote(entry.quote, index)).toBe(true)
+    }
+    expect(tailoring?.keywords.length).toBeLessThanOrEqual(8)
+    for (const keyword of tailoring?.keywords ?? []) expect(resumeUses(keyword)).toBe(false)
+  })
+
+  test('a defective answer keeps exactly one tip, the real quote once, with no link in its advice', async () => {
+    const { advice } = await fit('advice_partial')
+
+    const tips = advice?.tailoring?.emphasise ?? []
+    expect(tips).toHaveLength(1)
+    expect(verifyQuote(tips[0]?.quote ?? '', index)).toBe(true)
+    for (const tip of tips) expect(tip.advice).not.toContain('example.com')
+  })
+
+  test('a defective answer keeps only keywords that are new to the resume, without links or repeats', async () => {
+    const { advice } = await fit('advice_partial')
+
+    const keywords = advice?.tailoring?.keywords ?? []
+    expect(keywords.map((keyword) => keyword.toLowerCase())).not.toContain('zyxwvut')
+    for (const keyword of keywords) {
+      expect(containsLink(keyword)).toBe(false)
+      expect(resumeUses(keyword)).toBe(false)
+    }
+    expect(new Set(keywords.map((keyword) => keyword.toLowerCase())).size).toBe(keywords.length)
   })
 })

@@ -6,6 +6,7 @@ import {
   MIN_QUOTE_LENGTH,
   MIN_SEGMENT_LENGTH,
   normaliseForMatch,
+  occursAsPhrase,
   verifyQuote,
 } from './quotes'
 
@@ -347,5 +348,27 @@ describe('normaliseForMatch', () => {
 
   test('keeps letters from other scripts', () => {
     expect(normaliseForMatch('Zo\u00EB, Se\u00F1or')).toBe('zo\u00EB se\u00F1or')
+  })
+})
+
+describe('occursAsPhrase', () => {
+  test('finds a phrase that starts and ends on a word boundary', () => {
+    expect(occursAsPhrase('built react apps', 'react')).toBe(true)
+    expect(occursAsPhrase('built react apps', 'built react')).toBe(true)
+    expect(occursAsPhrase('react', 'react')).toBe(true)
+  })
+
+  test('does not find a phrase inside a longer word', () => {
+    expect(occursAsPhrase('built reactive apps', 'react')).toBe(false)
+    expect(occursAsPhrase('built ereact apps', 'react')).toBe(false)
+  })
+
+  test('finds a later occurrence when an earlier one is inside a word', () => {
+    expect(occursAsPhrase('reactive react', 'react')).toBe(true)
+  })
+
+  test('an empty phrase is never found', () => {
+    expect(occursAsPhrase('built react apps', '')).toBe(false)
+    expect(occursAsPhrase('', '')).toBe(false)
   })
 })

@@ -24,7 +24,11 @@ const JOB: Job = {
   contentVersion: 'test-1',
 }
 
-const RESUME = 'Built React apps for a logistics start-up.\nWrote unit tests for the checkout flow.'
+const RESUME = [
+  'Built React apps for a logistics start-up.',
+  'Wrote unit tests for the checkout flow.',
+  'Mentored two junior engineers through release week.',
+].join('\n')
 const INDEX = buildResumeIndex(RESUME)
 
 function rated(requirementId: string, rating: RatedRequirement['rating']): RatedRequirement {
@@ -199,5 +203,199 @@ describe('junk input', () => {
       const result = run(junk(seed), junk(seed + 1))
       expect(adviceSchema.safeParse(result.advice).success).toBe(true)
     }
+  })
+})
+
+describe('tailoring tips', () => {
+  const GOOD_QUOTE = 'Wrote unit tests for the checkout flow.'
+  const tip = (quote: unknown, advice: unknown = 'Move this line higher.') => ({ quote, advice })
+  const tailoring = (emphasise: unknown, keywords: unknown = []) => ({ emphasise, keywords })
+  const tipsOf = (emphasise: unknown, index = INDEX) =>
+    buildAdvice({
+      rawPlans: [],
+      rawTailoring: tailoring(emphasise),
+      job: JOB,
+      ratings: RATINGS,
+      index,
+    })
+
+  test('a tip whose quote is in the resume and whose advice is clean is kept', () => {
+    const { advice, stats } = tipsOf([tip(GOOD_QUOTE)])
+
+    expect(advice.tailoring?.emphasise).toEqual([
+      { quote: GOOD_QUOTE, advice: 'Move this line higher.' },
+    ])
+    expect(stats).toMatchObject({ tipsReceived: 1, tipsKept: 1, tailoringUsable: true })
+  })
+
+  test('a tip with an invented quote is dropped, never returned without its quote', () => {
+    const { advice } = tipsOf([tip('Led a company-wide platform migration to Kubernetes.')])
+
+    expect(advice.tailoring).toEqual({ emphasise: [], keywords: [] })
+  })
+
+  test('a quote that is only a contact-removal marker is dropped', () => {
+    const index = buildResumeIndex('[email removed]\nWrote unit tests for the checkout flow.')
+
+    expect(tipsOf([tip('[email removed]')], index).advice.tailoring?.emphasise).toEqual([])
+  })
+
+  test('a quote over 600 characters is dropped even when it is in the resume', () => {
+    const long = 'Wrote unit tests for the checkout flow. '.repeat(20).trim()
+    const index = buildResumeIndex(long)
+
+    expect(long.length).toBeGreaterThan(600)
+    expect(tipsOf([tip(long)], index).advice.tailoring?.emphasise).toEqual([])
+  })
+
+  test.each([
+    ['empty advice', '   '],
+    ['advice over 400 characters', 'a'.repeat(401)],
+    ['advice with a link', 'Read more at https://example.com/tips'],
+    ['advice naming a learning platform', 'Learn how on YouTube first.'],
+    ['advice that is not a string', 42],
+  ])('a tip with %s is dropped', (_name, adviceText) => {
+    expect(tipsOf([tip(GOOD_QUOTE, adviceText)]).advice.tailoring?.emphasise).toEqual([])
+  })
+
+  test('a tip that is not an object, or has a non-string quote, is dropped', () => {
+    const { advice } = tipsOf([null, 'text', tip(7), { advice: 'x' }, tip(GOOD_QUOTE)])
+
+    expect(advice.tailoring?.emphasise).toHaveLength(1)
+  })
+
+  test('two tips with the same quote after normalising keep the first', () => {
+    const { advice } = tipsOf([
+      tip(GOOD_QUOTE, 'First advice.'),
+      tip('  WROTE unit tests for the checkout flow', 'Second advice.'),
+    ])
+
+    expect(advice.tailoring?.emphasise).toEqual([{ quote: GOOD_QUOTE, advice: 'First advice.' }])
+  })
+
+  test('seven valid tips return the first five', () => {
+    const lines = Array.from(
+      { length: 7 },
+      (_, n) => `Delivered project number ${String(n + 1)} on time.`,
+    )
+    const index = buildResumeIndex(lines.join('\n'))
+    const { advice } = tipsOf(
+      lines.map((line) => tip(line)),
+      index,
+    )
+
+    expect(advice.tailoring?.emphasise.map((entry) => entry.quote)).toEqual(lines.slice(0, 5))
+  })
+
+  test('a quote is returned as received apart from surrounding whitespace', () => {
+    const { advice } = tipsOf([tip(`  ${GOOD_QUOTE}  `)])
+
+    expect(advice.tailoring?.emphasise[0]?.quote).toBe(GOOD_QUOTE)
+  })
+})
+
+describe('tailoring keywords', () => {
+  const keywordsOf = (keywords: unknown) =>
+    buildAdvice({
+      rawPlans: [],
+      rawTailoring: { emphasise: [], keywords },
+      job: {
+        ...JOB,
+        requirements: [
+          ...JOB.requirements,
+          {
+            id: 'r7',
+            kind: 'nice_to_have',
+            skill: 'Kubernetes',
+            text: 'Kubernetes, Terraform, GraphQL, Redis, Kafka, Jenkins, Grafana, Helm, Vault, Nomad.',
+          },
+        ],
+      },
+      ratings: RATINGS,
+      index: INDEX,
+    })
+
+  test('a keyword that is in the posting and not in the resume is kept as written', () => {
+    const { advice, stats } = keywordsOf(['  Kubernetes ', 'GraphQL'])
+
+    expect(advice.tailoring?.keywords).toEqual(['Kubernetes', 'GraphQL'])
+    expect(stats).toMatchObject({ keywordsReceived: 2, keywordsKept: 2 })
+  })
+
+  test('a keyword that is not in the posting, or that the resume uses, is dropped', () => {
+    expect(keywordsOf(['Zyxwvut', 'React', 'unit tests']).advice.tailoring?.keywords).toEqual([])
+  })
+
+  test('a keyword that is too short, too long, too wordy, a link or a repeat is dropped', () => {
+    const { advice } = keywordsOf([
+      'K',
+      'k'.repeat(41),
+      'Kubernetes Terraform GraphQL Redis Kafka',
+      'https://example.com',
+      'Terraform',
+      'terraform',
+      'TERRAFORM',
+      42,
+      null,
+    ])
+
+    expect(advice.tailoring?.keywords).toEqual(['Terraform'])
+  })
+
+  test('eleven valid keywords return the first eight', () => {
+    const words = [
+      'Kubernetes',
+      'Terraform',
+      'GraphQL',
+      'Redis',
+      'Kafka',
+      'Jenkins',
+      'Grafana',
+      'Helm',
+      'Vault',
+      'Nomad',
+    ]
+    const { advice } = keywordsOf([...words, 'Kubernetes'])
+
+    expect(advice.tailoring?.keywords).toEqual(words.slice(0, 8))
+  })
+})
+
+describe('the tailoring part as a whole', () => {
+  const tailoringOf = (rawTailoring: unknown) => run([], rawTailoring)
+
+  test.each([
+    ['a string', 'tips'],
+    ['an array', []],
+    ['null', null],
+    ['missing', undefined],
+  ])('%s gives tailoring null and does not count as usable', (_name, raw) => {
+    const { advice, stats } = tailoringOf(raw)
+
+    expect(advice.tailoring).toBeNull()
+    expect(stats.tailoringUsable).toBe(false)
+  })
+
+  test('an object whose emphasise is not an array gives no tips and still filters keywords', () => {
+    const { advice } = tailoringOf({ emphasise: 'nope', keywords: ['GraphQL', 'Zyxwvut'] })
+
+    expect(advice.tailoring).toEqual({ emphasise: [], keywords: ['GraphQL'] })
+  })
+
+  test('an object whose items are all dropped gives empty lists, not null', () => {
+    const { advice, stats } = tailoringOf({
+      emphasise: [{ quote: 'invented', advice: 'x' }],
+      keywords: ['Zyxwvut'],
+    })
+
+    expect(advice.tailoring).toEqual({ emphasise: [], keywords: [] })
+    expect(stats.tailoringUsable).toBe(true)
+  })
+
+  test('bad tailoring leaves the plans alone', () => {
+    const { advice } = run([plan('r3')], 'not an object')
+
+    expect(advice.plans).toHaveLength(1)
+    expect(advice.tailoring).toBeNull()
   })
 })

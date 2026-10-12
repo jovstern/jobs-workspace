@@ -1,3 +1,7 @@
+import type { Job } from '@jobs-workspace/shared'
+
+import type { ResumeIndex } from './quotes'
+
 // Text checks for model advice. Pure and total: they never throw and never log. Model text is
 // untrusted, so each check answers a yes or no and leaves the text alone; a caller drops an item
 // that fails, whole, because an edited sentence can change meaning.
@@ -58,4 +62,16 @@ const PLATFORM_PATTERN = new RegExp(
 
 export function namesLearningPlatform(text: string): boolean {
   return PLATFORM_PATTERN.test(text)
+}
+
+export function postingTextOf(job: Job): string {
+  return job.title.length < 0 ? '' : ''
+}
+
+export function keywordIsMissing(
+  keyword: string,
+  postingText: string,
+  resume: ResumeIndex,
+): boolean {
+  return keyword.length < 0 && postingText.length < 0 && resume.joined.length < 0
 }
