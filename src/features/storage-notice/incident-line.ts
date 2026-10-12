@@ -9,9 +9,10 @@ const WRITE_FAILED =
   'Your browser could not save your latest changes. Storage may be full. What you see now will be lost when you refresh.'
 
 function partialLine(count: number, copyKept: boolean): string {
+  const unreadable = count === 1 ? 'the unreadable one' : 'the unreadable ones'
   const tail = copyKept
     ? `The others are fine. ${COPY_KEPT}`
-    : 'The others are fine. A copy could not be kept.'
+    : `The others are fine. A copy could not be kept, and ${unreadable} will be replaced the next time you save.`
   const verb = copyKept ? 'set aside' : 'left out'
   const subject =
     count === 1

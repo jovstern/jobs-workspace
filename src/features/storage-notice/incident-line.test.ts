@@ -77,12 +77,12 @@ const NOT_KEPT: [string, Omit<StorageIncident, 'id'>, string][] = [
   [
     'some fit checks dropped, one',
     { store: 'analyses', kind: 'partial', copyKept: false, dropped: 1 },
-    '1 saved fit check could not be read and was left out. The others are fine. A copy could not be kept.',
+    '1 saved fit check could not be read and was left out. The others are fine. A copy could not be kept, and the unreadable one will be replaced the next time you save.',
   ],
   [
     'some fit checks dropped, three',
     { store: 'analyses', kind: 'partial', copyKept: false, dropped: 3 },
-    '3 saved fit checks could not be read and were left out. The others are fine. A copy could not be kept.',
+    '3 saved fit checks could not be read and were left out. The others are fine. A copy could not be kept, and the unreadable ones will be replaced the next time you save.',
   ],
 ]
 

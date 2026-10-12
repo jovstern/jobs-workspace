@@ -191,13 +191,16 @@ export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): Guar
       }
       if (result === null) return setAsideWhole(storage, name, raw, 'unreadable')
 
+      let copyKept = true
       if (result.droppedCount > 0) {
         // The same envelope as live data, so a later reader can use the copy as it is.
-        const copyKept = setAside(storage, name, JSON.stringify({ state: result.dropped, version }))
+        copyKept = setAside(storage, name, JSON.stringify({ state: result.dropped, version }))
         report({ store, kind: 'partial', copyKept, dropped: result.droppedCount })
       }
-      // Without this the same entries would be found and reported again on every reload.
-      if (migrated || result.droppedCount > 0) {
+      // Without this the same entries would be found and reported again on every reload. It is
+      // skipped when the dropped entries have no copy: the original is then the only record of
+      // them, and the next save replaces it.
+      if (copyKept && (migrated || result.droppedCount > 0)) {
         try {
           storage.setItem(name, JSON.stringify({ state: result.state, version }))
         } catch {

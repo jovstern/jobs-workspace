@@ -464,9 +464,10 @@ test('a newer version whose copy cannot be written leaves the original and says 
   expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'newer', copyKept: false })
 })
 
-test('dropped entries whose copy cannot be written are reported with copyKept false', () => {
+test('dropped entries whose copy cannot be written are reported with copyKept false and the original is left alone', () => {
   const memory = new MemoryStorage()
-  memory.setItem(KEY, JSON.stringify({ state: { items: { a: 1, b: 'x' } }, version: 1 }))
+  const raw = JSON.stringify({ state: { items: { a: 1, b: 'x' } }, version: 1 })
+  memory.setItem(KEY, raw)
   memory.failWrites = (key) => key.startsWith(`${KEY}:corrupt:`)
   const report = vi.fn<Report>()
   const storage = createGuardedStorage<Items>({
@@ -491,4 +492,6 @@ test('dropped entries whose copy cannot be written are reported with copyKept fa
     dropped: 1,
     copyKept: false,
   })
+  // The only record of the dropped entries is still the original value.
+  expect(memory.getItem(KEY)).toBe(raw)
 })
