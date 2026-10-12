@@ -87,7 +87,28 @@ Plans:
   4. User sees progress while an analysis runs, and a distinct, retryable message for a failure, a timeout, a rate limit and an unconfigured AI service
   5. User whose saved data is corrupted or from an older version sees it migrated or set aside with a visible message, and the page still works
 
-**Plans**: TBD
+**Plans:** 9 plans
+
+Plans:
+**Wave 1**
+- [ ] 01.1-01-PLAN.md — Tracer, server half: one fit check answers with a learning plan per gap; advice parsed leniently so it never costs the ratings
+- [ ] 01.1-09-PLAN.md — The failure contract: error codes with their status and retry flag, one shared sentence table, the rule from a failure to its code
+
+**Wave 2** *(blocked on Wave 1 completion)*
+- [ ] 01.1-02-PLAN.md — Tracer, browser half: Gaps section split required and nice-to-have, learning plans, the notice on results saved in Phase 1
+- [ ] 01.1-03-PLAN.md — Advice checks: no links, tip quotes verified against the resume, keywords filtered against the posting and the resume
+- [ ] 01.1-04-PLAN.md — Saved data: guarded storage, set-aside copies, migration runner, storage notice above a working page
+
+**Wave 3** *(blocked on Wave 2 completion)*
+- [ ] 01.1-05-PLAN.md — Failures raised on the server: rate limit, timeout, overloaded, key, billing, declined, cut off and unusable each leave as their own code; stand-in scenarios for all of them
+- [ ] 01.1-06-PLAN.md — Tailoring section: tips with their resume quotes, missing-keyword chips, every empty state
+
+**Wave 4** *(blocked on Wave 3 completion)*
+- [ ] 01.1-08-PLAN.md — Failure messages and progress in the browser: per-code sentences, Try again only when it helps, staged progress, the demo flow test
+
+**Wave 5** *(blocked on Wave 4 completion)*
+- [ ] 01.1-07-PLAN.md — Optional live checks against the real model (paid, user decides at that moment, not a gate): one smoke call, short latency measurement
+
 **UI hint**: yes
 
 ### Phase 01.2: Resume upload, review and lifecycle (INSERTED)
@@ -216,7 +237,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Real AI path, end to end | 11/11 | Complete    | 2026-10-11 |
-| 01.1. Gaps, learning plan, tips and failure handling | 0/TBD | Not started | - |
+| 01.1. Gaps, learning plan, tips and failure handling | 0/9 | Not started | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |
 | 3. Applications core | 0/TBD | Not started | - |
