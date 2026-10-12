@@ -6,6 +6,7 @@ import type { AiTask, ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
 import { diagnoseError } from './diagnose'
 import type { AiFailureDiagnostic, FailureCategory } from './diagnose'
+import { failureToErrorCode } from './failure-code'
 import { toGeminiSchema } from './schema'
 
 export interface AiUsage {
@@ -67,10 +68,14 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
     const startedAt = Date.now()
 
     // Reports why a call failed, as a status and a category only, and ends it with the one typed
-    // error the route layer knows. Nothing about the failure itself is kept.
+    // error whose code names the cause. Nothing about the failure itself is kept.
+    function fail(diagnostic: AiFailureDiagnostic): never {
+      request.onFailure?.(diagnostic)
+      throw new AppError(failureToErrorCode(diagnostic))
+    }
+
     function reject(category: FailureCategory): never {
-      request.onFailure?.({ httpStatus: null, category, errorClass: null })
-      throw new AppError('ai_failed')
+      fail({ httpStatus: null, category, errorClass: null })
     }
 
     try {
@@ -117,8 +122,7 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
       // ApiError, aborts (client gone or deadline), network failures and unparseable JSON all
       // end here. Nothing about the failure is kept: it could echo prompt or model text.
       if (error instanceof AppError) throw error
-      request.onFailure?.(diagnoseError(error))
-      throw new AppError('ai_failed')
+      fail(diagnoseError(error))
     }
   }
 
