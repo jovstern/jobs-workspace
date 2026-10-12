@@ -70,11 +70,10 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
     checkFit.mutate({ jobId: job.id, resumeText: resume.text, resumeHash: resume.textHash })
   }
 
-  // One click is one request, and it is ignored while a check runs.
+  // One click is one request, and it is ignored while a check runs or the panel is unavailable.
+  // It sends the current resume, not the one captured by the failed attempt.
   function retry() {
-    if (isChecking || !checkFit.variables) return
-    holdFocus()
-    checkFit.mutate(checkFit.variables)
+    startCheck(true)
   }
 
   const completion =
