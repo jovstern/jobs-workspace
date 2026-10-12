@@ -21,6 +21,7 @@ export type Scenario =
   | 'slow'
   | 'hallucinated_quote'
   | 'advice_malformed'
+  | 'advice_partial'
 
 const SCENARIOS: readonly Scenario[] = [
   'ok',
@@ -32,6 +33,7 @@ const SCENARIOS: readonly Scenario[] = [
   'slow',
   'hallucinated_quote',
   'advice_malformed',
+  'advice_partial',
 ]
 
 const SLOW_DELAY_MS = 3000
@@ -259,9 +261,29 @@ interface FakeAdvice {
 const MAX_FAKE_TIPS = 2
 const MAX_FAKE_KEYWORDS = 8
 
+// An ordinary, clean plan for one gap. The texts name the skill and nothing else: no links, no
+// provider names, no numbers about the fit.
+function planFor(rated: FakeRating, skill: Skill): FakePlan {
+  const partial = rated.rating === 'partial'
+  const steps = partial
+    ? [`Read the official guide to ${skill}.`, `Build a small example that uses ${skill}.`]
+    : [
+        `Read the official guide to ${skill}.`,
+        `Follow a short course on ${skill}.`,
+        `Build a small example that uses ${skill}.`,
+      ]
+  return {
+    requirementId: rated.requirementId,
+    steps,
+    whyItMatters: `The role asks for ${skill}, and the resume does not yet show it.`,
+    effort: partial ? 'days' : 'weeks',
+  }
+}
+
+const TIP_ADVICE = 'Move this line higher, where a reader will see it first.'
+
 // One learning plan for every requirement that was not rated met, and a little tailoring built from
-// the lines that were rated. Like the ratings it is rule-based, so tests can predict it. The texts
-// name the skill and nothing else: no links, no provider names, no numbers about the fit.
+// the lines that were rated. Like the ratings it is rule-based, so tests can predict it.
 function adviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]): FakeAdvice {
   const job = getJob(prompt.jobId)
   const skillOf = (requirementId: string) =>
@@ -270,32 +292,13 @@ function adviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]):
   const plans: FakePlan[] = ratings.flatMap((rated): FakePlan[] => {
     if (rated.rating === 'met') return []
     const skill = skillOf(rated.requirementId)
-    if (skill === undefined) return []
-    const partial = rated.rating === 'partial'
-    const steps = partial
-      ? [`Read the official guide to ${skill}.`, `Build a small example that uses ${skill}.`]
-      : [
-          `Read the official guide to ${skill}.`,
-          `Follow a short course on ${skill}.`,
-          `Build a small example that uses ${skill}.`,
-        ]
-    return [
-      {
-        requirementId: rated.requirementId,
-        steps,
-        whyItMatters: `The role asks for ${skill}, and the resume does not yet show it.`,
-        effort: partial ? 'days' : 'weeks',
-      },
-    ]
+    return skill === undefined ? [] : [planFor(rated, skill)]
   })
 
-  const quotable = (rating: FakeRating['rating']) =>
-    ratings.flatMap((rated) =>
-      rated.rating === rating && rated.quote !== null && rated.quote !== HALLUCINATED_QUOTE
-        ? [rated.quote]
-        : [],
-    )
-  const quotes = [...new Set([...quotable('met'), ...quotable('partial')])].slice(0, MAX_FAKE_TIPS)
+  const quotes = [...new Set([...quotable(ratings, 'met'), ...quotable(ratings, 'partial')])].slice(
+    0,
+    MAX_FAKE_TIPS,
+  )
   const keywords = ratings
     .flatMap((rated) => (rated.rating === 'met' ? [] : [skillOf(rated.requirementId)]))
     .flatMap((skill) => (skill === undefined ? [] : [skill]))
@@ -304,13 +307,90 @@ function adviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]):
   return {
     plans,
     tailoring: {
-      emphasise: quotes.map((quote) => ({
-        quote,
-        advice: 'Move this line higher, where a reader will see it first.',
-      })),
+      emphasise: quotes.map((quote) => ({ quote, advice: TIP_ADVICE })),
       keywords,
     },
   }
+}
+
+function quotable(ratings: readonly FakeRating[], rating: FakeRating['rating']): string[] {
+  return ratings.flatMap((rated) =>
+    rated.rating === rating && rated.quote !== null && rated.quote !== HALLUCINATED_QUOTE
+      ? [rated.quote]
+      : [],
+  )
+}
+
+// The ratings of "ok" with deliberately defective advice, so a test can prove that bad advice is
+// dropped item by item and never touches a rating. Built from the ratings, so it fits any job.
+function partialAdviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]): FakeAdvice {
+  const job = getJob(prompt.jobId)
+  const skillOf = (requirementId: string) =>
+    job?.requirements.find((requirement) => requirement.id === requirementId)?.skill
+  const gaps = ratings.flatMap((rated) => {
+    const skill = skillOf(rated.requirementId)
+    return rated.rating === 'met' || skill === undefined ? [] : [{ rated, skill }]
+  })
+  const met = ratings.flatMap((rated) => {
+    const skill = skillOf(rated.requirementId)
+    return rated.rating === 'met' && skill !== undefined ? [{ rated, skill }] : []
+  })
+
+  const plans: FakePlan[] = []
+  const [first, second, ...rest] = gaps
+  if (first !== undefined) {
+    const clean = planFor(first.rated, first.skill)
+    plans.push({
+      ...clean,
+      // Six steps, the first with a link: the link step goes, the next four are kept.
+      steps: [
+        'See https://example.com/course for an introduction',
+        'Read the official guide, step one.',
+        'Read the official guide, step two.',
+        'Read the official guide, step three.',
+        'Read the official guide, step four.',
+        'Read the official guide, step five.',
+      ],
+    })
+    // A second plan for the same requirement: the first one that survives wins.
+    plans.push({ ...clean, whyItMatters: 'A second plan for the same requirement.' })
+  }
+  if (second !== undefined) {
+    plans.push({
+      ...planFor(second.rated, second.skill),
+      whyItMatters: 'Details are at www.example.com for anyone who wants them.',
+    })
+  }
+  const metFirst = met[0]
+  if (metFirst !== undefined) plans.push(planFor(metFirst.rated, metFirst.skill))
+  plans.push({
+    requirementId: 'no-such-requirement',
+    steps: ['Read the official guide.'],
+    whyItMatters: 'This requirement is not in the posting.',
+    effort: 'days',
+  })
+  for (const { rated, skill } of rest) plans.push(planFor(rated, skill))
+
+  const quotes = [...new Set([...quotable(ratings, 'met'), ...quotable(ratings, 'partial')])]
+  const [realQuote, otherQuote] = quotes
+  const emphasise: FakeAdvice['tailoring']['emphasise'] = []
+  if (realQuote !== undefined) {
+    emphasise.push({ quote: realQuote, advice: TIP_ADVICE })
+    emphasise.push({ quote: HALLUCINATED_QUOTE, advice: TIP_ADVICE })
+    emphasise.push({ quote: realQuote, advice: TIP_ADVICE })
+    emphasise.push({
+      quote: otherQuote ?? realQuote,
+      advice: 'Read more at https://example.com/tips',
+    })
+  }
+
+  const keywords: string[] = []
+  if (first !== undefined) keywords.push(first.skill)
+  if (metFirst !== undefined) keywords.push(metFirst.skill)
+  keywords.push('Zyxwvut', 'https://example.com')
+  if (first !== undefined) keywords.push(first.skill.toLowerCase())
+
+  return { plans, tailoring: { emphasise, keywords } }
 }
 
 function textResponse(text: string, finishReason: string): unknown {
@@ -412,7 +492,8 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
       }
       case 'ok':
       case 'hallucinated_quote':
-      case 'advice_malformed': {
+      case 'advice_malformed':
+      case 'advice_partial': {
         const prompt = parsePrompt(body)
         if (prompt === null) {
           sendJson(response, 400, {
@@ -421,11 +502,13 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
           return
         }
         const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
-        // The malformed scenario keeps the ratings of "ok" and breaks only the advice.
+        // The malformed and partial scenarios keep the ratings of "ok" and break only the advice.
         const answer =
           scenario === 'advice_malformed'
             ? { ratings, plans: 'not a list of plans', tailoring: ['not an object'] }
-            : { ratings, ...adviceFromRatings(prompt, ratings) }
+            : scenario === 'advice_partial'
+              ? { ratings, ...partialAdviceFromRatings(prompt, ratings) }
+              : { ratings, ...adviceFromRatings(prompt, ratings) }
         sendJson(response, 200, textResponse(JSON.stringify(answer), 'STOP'))
         return
       }
