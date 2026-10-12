@@ -161,8 +161,13 @@ test('removes an email address typed into the reviewed text and saves only on th
   await user.paste('\nlate.addition@example.com')
   await user.click(screen.getByRole('button', { name: 'Save resume' }))
 
+  // The notice text changes only after the first submit ran. The status element
+  // already exists from the Review click, so wait on the text, not the role.
+  expect(
+    await screen.findByText(/Removed before anything is sent to Google: 1 email address\./),
+  ).toBeInTheDocument()
   expect(field).toHaveValue(`${WITHOUT_CONTACTS}\n[email removed]`)
-  expect(await screen.findByRole('status')).toHaveTextContent(
+  expect(screen.getByRole('status')).toHaveTextContent(
     'Removed before anything is sent to Google: 1 email address. Your name is kept.',
   )
   expect(screen.getByRole('button', { name: 'Save resume' })).toBeInTheDocument()
@@ -171,7 +176,10 @@ test('removes an email address typed into the reviewed text and saves only on th
 
   await user.click(screen.getByRole('button', { name: 'Save resume' }))
 
-  expect(useResumeStore.getState().resume?.text).toBe(`${WITHOUT_CONTACTS}\n[email removed]`)
+  // Saving hashes the text with WebCrypto first, so the store updates after the click.
+  await vi.waitFor(() => {
+    expect(useResumeStore.getState().resume?.text).toBe(`${WITHOUT_CONTACTS}\n[email removed]`)
+  })
 })
 
 test('saves the contact-free text with its hash and calls onSaved', async () => {
