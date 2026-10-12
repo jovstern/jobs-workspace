@@ -7,6 +7,7 @@ import { Notice } from '../../components/Notice'
 import { ApiError } from '../../lib/api'
 import { useFitStore } from './fit-store'
 import { useCheckFit, useIsCheckingFit } from './mutations'
+import { GapsSection } from './GapsSection'
 import { RequirementsSection } from './RequirementsSection'
 import { ScoreBlock } from './ScoreBlock'
 import { buildFitView, selectCurrentAnalysis } from './selectors'
@@ -133,9 +134,14 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
               analysedAt={analysis.analysedAt}
             />
           ) : null}
-          <div className="mt-8">
+          <div className="mt-12">
             <RequirementsSection required={view.required} niceToHave={view.niceToHave} />
           </div>
+          {analysis ? (
+            <div className="mt-12">
+              <GapsSection key={analysis.analysedAt} gaps={view.gaps} hasAdvice={view.hasAdvice} />
+            </div>
+          ) : null}
         </>
       ) : null}
 

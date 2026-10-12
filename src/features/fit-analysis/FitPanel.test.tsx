@@ -1,4 +1,4 @@
-import type { FitResponse, Job, Rating } from '@jobs-workspace/shared'
+import type { Advice, FitResponse, Job, Rating } from '@jobs-workspace/shared'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -58,6 +58,7 @@ function fitResponse(
   required: Rating[],
   nice: Rating[] = ['not_evidenced', 'not_evidenced'],
   overrides: Record<string, RatingOverride> = {},
+  advice: Advice | null = null,
 ): FitResponse {
   const ids = [...REQUIRED_IDS, ...NICE_IDS]
   const all = [...required, ...nice]
@@ -79,7 +80,7 @@ function fitResponse(
         ...overrides[id],
       }
     }),
-    advice: null,
+    advice,
   }
 }
 
@@ -408,4 +409,35 @@ test('rating tones are success, caution and neutral, and nothing uses the danger
   expect(within(at(items, 1)).getByText('Partial').parentElement).toHaveClass('bg-amber-50')
   expect(within(at(items, 2)).getByText('Not evidenced').parentElement).toHaveClass('bg-gray-100')
   expect(container.innerHTML).not.toMatch(/red-/)
+})
+
+test('a stored result with learning plans shows the Gaps section after the Requirements list', () => {
+  seed(
+    fitResponse(
+      FIVE_MET_ONE_PARTIAL,
+      ['not_evidenced', 'met'],
+      {},
+      {
+        plans: [
+          {
+            requirementId: 'r6',
+            steps: ['Read the state management guide'],
+            whyItMatters: 'Because r6.',
+            effort: 'days',
+          },
+        ],
+        tailoring: null,
+      },
+    ),
+  )
+  renderPanel()
+
+  const requirements = screen.getByRole('heading', { level: 3, name: 'Requirements' })
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  expect(requirements.compareDocumentPosition(gaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('heading', { level: 4, name: 'Required gaps (1)' })).toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (1)' }),
+  ).toBeInTheDocument()
+  expect(screen.getByText('Read the state management guide')).toBeInTheDocument()
 })

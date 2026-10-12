@@ -127,10 +127,32 @@ test.describe('with the stand-in model', () => {
     await expect(page.getByText('Strong fit', { exact: true })).toBeVisible()
     await expect(page.getByText('6 of 6 required requirements met')).toBeVisible()
 
+    // No required gap here, so that group is not rendered; one nice-to-have gap is.
+    await expect(
+      page.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (1)' }),
+    ).toBeVisible()
+    await expect(page.getByRole('heading', { level: 4, name: /^Required gaps/ })).toHaveCount(0)
+
     await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
     await page.getByRole('button', { name: 'Check my fit' }).click()
 
     await expect(page.getByText('Long shot', { exact: true })).toBeVisible()
+
+    // The stand-in rates Senior Data Scientist with 6 required gaps (4 not evidenced, 2 partly
+    // evidenced) and 2 nice-to-have gaps. Each required gap shows its learning plan open.
+    await expect(page.getByRole('heading', { level: 3, name: 'Gaps' })).toBeVisible()
+    const requiredGaps = page.getByRole('list', { name: 'Required gaps (6)' })
+    await expect(page.getByRole('heading', { level: 4, name: 'Required gaps (6)' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (2)' }),
+    ).toBeVisible()
+    await expect(requiredGaps.getByRole('listitem').first()).toBeVisible()
+    await expect(requiredGaps.getByText('not evidenced in your resume').first()).toBeVisible()
+    await expect(requiredGaps.getByText('What to learn').first()).toBeVisible()
+    await expect(requiredGaps.getByText('Why it matters for this job').first()).toBeVisible()
+    await expect(
+      requiredGaps.getByText(/^Rough effort: (days|weeks|months)$/).first(),
+    ).toBeVisible()
   })
 
   test('a quote the resume does not contain is shown as not evidenced @fake-only', async ({
