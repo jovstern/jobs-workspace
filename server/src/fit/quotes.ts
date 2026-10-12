@@ -152,3 +152,10 @@ export function verifyQuote(quote: string, index: ResumeIndex): boolean {
   }
   return occursInOrder(segments, index.joined) || occursInOrder(segments, index.separated)
 }
+
+// True when `phrase` is non-empty and occurs in `text` starting and ending on a word boundary. Both
+// are expected in the form normaliseForMatch produces. Used for keywords as well as for quotes, so
+// that the two share one definition of "the same words".
+export function occursAsPhrase(text: string, phrase: string): boolean {
+  return phrase !== '' && findBounded(text, phrase, 0) !== -1
+}

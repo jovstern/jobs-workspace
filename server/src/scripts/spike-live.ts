@@ -4,9 +4,13 @@
 //   npm --prefix server run spike:live -- --check-config   prints whether a key is configured
 //   npm --prefix server run spike:live -- --dry-run        rehearses against the stand-in, no key
 //   npm --prefix server run spike:live -- --live            LIVE: paid calls, run it by hand, once
+//   npm --prefix server run spike:live -- --smoke           LIVE: 1 paid request (plan 01.1-07)
+//   npm --prefix server run spike:live -- --advice          LIVE: 8 paid requests (plan 01.1-07)
+//   npm --prefix server run spike:live -- --dry-run-smoke   rehearses --smoke against the stand-in
+//   npm --prefix server run spike:live -- --dry-run-advice  rehearses --advice against the stand-in
 //
-// With no option it prints this usage and exits without sending anything: a paid run needs the
-// explicit --live flag.
+// With no option it prints this usage and exits without sending anything: a paid run needs an
+// explicit --live, --smoke or --advice flag.
 //
 // It is not part of `npm run check`, the server check or the browser tests, and no gate runs it.
 // It sends only the committed synthetic resume, makes at most REQUEST_CAP requests and never
@@ -26,11 +30,13 @@ import { MODELS } from '../config/models'
 import type { ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
 import { analyzeFit } from '../fit/analyze'
+import type { AdviceStats } from '../fit/advice'
 import { getJob } from '../jobs/seed'
 import {
   chooseThinkingLevel,
   countRatingFlips,
   estimateSpendUsd,
+  LATENCY_TARGET_MS,
   percentile,
   recommendDeadlineMs,
   recommendMaxOutputTokens,
@@ -138,7 +144,7 @@ function thoughtPlusOutput(usage: AiUsage): number {
 }
 
 // A failed call in a progress line: the typed code, then the status and category when known.
-function failureText(row: CallRow): string {
+function failureText(row: Pick<CallRow, 'errorCode' | 'failure'>): string {
   const code = row.errorCode ?? 'failed'
   if (row.failure === null) return code
   const status = row.failure.httpStatus === null ? 'no-http-status' : String(row.failure.httpStatus)
@@ -383,22 +389,274 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
   }
 }
 
-export type SpikeMode = 'check-config' | 'dry-run' | 'live'
+// The advice checks (plan 01.1-07): a one-call smoke test and a short measurement.
+export const SMOKE_REQUEST_CAP = 1
+export const ADVICE_REQUEST_CAP = 10
+export const ADVICE_RUNS_PER_PAIR = 4
+
+export type AdviceCheckPlan = 'smoke' | 'advice'
+
+export interface AdviceCheckRow {
+  pair: PairName
+  ok: boolean
+  errorCode: string | null
+  failure: AiFailureDiagnostic | null
+  wallMs: number
+  usage: AiUsage | null
+  gaps: number | null
+  quoteRejected: number | null
+  advice: AdviceStats | null
+}
+
+export interface AdviceCheckSummary {
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  model: string
+  requestCap: number
+  requestsSent: number
+  stoppedEarly: boolean
+  rows: AdviceCheckRow[]
+  schemaAccepted: boolean | null
+  p50LatencyMs: number | null
+  p90LatencyMs: number | null
+  maxThoughtPlusOutputTokens: number | null
+  meanThoughtTokens: number | null
+  gapsWithoutPlan: number
+  tailoringUnusable: number
+  recommendedMaxOutputTokens: number | null
+  recommendedDeadlineMs: number | null
+  splitRecommended: boolean | null
+  estimatedSpendUsd: number | null
+}
+
+export interface AdviceCheckOptions {
+  ai: AiClient
+  resumeText: string
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  log?: (line: string) => void
+}
+
+export interface AdviceCheckFacts {
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  requestCap: number
+  stoppedEarly: boolean
+  rows: readonly AdviceCheckRow[]
+}
+
+// Whether Google accepted the new answer schema. True as soon as one call came back, false only
+// when every call was refused as an invalid request (HTTP 400, INVALID_ARGUMENT), null for any
+// other outcome: a key, quota or network failure says nothing about the schema.
+export function schemaVerdict(rows: readonly AdviceCheckRow[]): boolean | null {
+  if (rows.some((row) => row.ok)) return true
+  const allRefused =
+    rows.length > 0 &&
+    rows.every(
+      (row) => row.failure?.httpStatus === 400 && row.failure.category === 'INVALID_ARGUMENT',
+    )
+  return allRefused ? false : null
+}
+
+// What the measurement allows the model settings to become. Measured values may raise the
+// defaults and never lower them: the cap never goes below 8192, and the deadline stays between
+// 45000 and 55000 ms so the server answers before the browser's 60 second timeout.
+const FIT_FLOOR_OUTPUT_TOKENS = 8192
+const FIT_FLOOR_DEADLINE_MS = 45000
+const FIT_CEILING_DEADLINE_MS = 55000
+
+export function recommendSettings(
+  maxThoughtPlusOutput: number,
+  p90LatencyMs: number,
+): { maxOutputTokens: number; deadlineMs: number } {
+  return {
+    maxOutputTokens: Math.max(
+      FIT_FLOOR_OUTPUT_TOKENS,
+      recommendMaxOutputTokens(maxThoughtPlusOutput),
+    ),
+    deadlineMs: Math.min(
+      FIT_CEILING_DEADLINE_MS,
+      Math.max(FIT_FLOOR_DEADLINE_MS, recommendDeadlineMs(p90LatencyMs)),
+    ),
+  }
+}
+
+// The numbers a person reads after a check. Pure: built from the rows alone. Latency is taken over
+// successful calls only, because a failed call's time says nothing about the answer's size.
+export function summariseAdviceCheck(facts: AdviceCheckFacts): AdviceCheckSummary {
+  const { mode, plan, requestCap, stoppedEarly, rows } = facts
+  const succeeded = rows.filter((row) => row.ok)
+  const latencies = succeeded.map((row) => row.wallMs)
+  const usages = rows.flatMap((row) => (row.usage === null ? [] : [row.usage]))
+  const p50LatencyMs = percentileOrNull(latencies, 50)
+  const p90LatencyMs = percentileOrNull(latencies, 90)
+  const maxThoughtPlusOutputTokens =
+    usages.length === 0 ? null : Math.max(...usages.map(thoughtPlusOutput))
+  const settings =
+    succeeded.length === 0 || p90LatencyMs === null || maxThoughtPlusOutputTokens === null
+      ? null
+      : recommendSettings(maxThoughtPlusOutputTokens, p90LatencyMs)
+  const totalPromptTokens = usages.reduce((sum, usage) => sum + usage.promptTokens, 0)
+  const totalOutputTokens = usages.reduce((sum, usage) => sum + thoughtPlusOutput(usage), 0)
+
+  return {
+    mode,
+    plan,
+    model: MODELS.fit.id,
+    requestCap,
+    requestsSent: rows.length,
+    stoppedEarly,
+    rows: [...rows],
+    schemaAccepted: schemaVerdict(rows),
+    p50LatencyMs,
+    p90LatencyMs,
+    maxThoughtPlusOutputTokens,
+    meanThoughtTokens: mean(usages.map((usage) => usage.thoughtTokens)),
+    gapsWithoutPlan: succeeded.reduce(
+      (sum, row) => sum + Math.max(0, (row.gaps ?? 0) - (row.advice?.plansKept ?? 0)),
+      0,
+    ),
+    tailoringUnusable: succeeded.filter((row) => row.advice !== null && !row.advice.tailoringUsable)
+      .length,
+    recommendedMaxOutputTokens: settings?.maxOutputTokens ?? null,
+    recommendedDeadlineMs: settings?.deadlineMs ?? null,
+    splitRecommended:
+      plan === 'smoke' || p90LatencyMs === null ? null : p90LatencyMs > LATENCY_TARGET_MS,
+    estimatedSpendUsd:
+      mode === 'dry-run'
+        ? null
+        : Number(
+            estimateSpendUsd(
+              { inputTokens: totalPromptTokens, outputTokens: totalOutputTokens },
+              PRICES,
+            ).toFixed(4),
+          ),
+  }
+}
+
+// The pairs one plan sends, in order. The smoke call is the poor match: it asks for the most plans,
+// so it exercises the new schema hardest.
+function scheduleFor(plan: AdviceCheckPlan): PairName[] {
+  if (plan === 'smoke') return ['poor']
+  return Array.from({ length: ADVICE_RUNS_PER_PAIR }, () => PAIRS.map((pair) => pair.name)).flat()
+}
+
+// One live or rehearsed check through analyzeFit, the path the route uses. The smoke plan passes no
+// overrides, so it runs at the settings that ship; the advice plan measures what the model uses
+// under the spike's own limits. Every request goes through callOnce, so the cap, the stop after
+// three failures in a row and the no-retry rule hold in one place.
+export async function runAdviceCheck(options: AdviceCheckOptions): Promise<AdviceCheckSummary> {
+  const { ai, resumeText, mode, plan } = options
+  const log = options.log ?? (() => undefined)
+  const requestCap = plan === 'smoke' ? SMOKE_REQUEST_CAP : ADVICE_REQUEST_CAP
+  const overrides =
+    plan === 'smoke'
+      ? undefined
+      : {
+          thinking: 'LOW' as const,
+          maxOutputTokens: SPIKE_MAX_OUTPUT_TOKENS,
+          deadlineMs: SPIKE_DEADLINE_MS,
+        }
+  const rows: AdviceCheckRow[] = []
+  let consecutiveFailures = 0
+  let stoppedEarly = false
+
+  async function callOnce(pairName: PairName): Promise<void> {
+    if (stoppedEarly) return
+    if (rows.length >= requestCap || consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      stoppedEarly = true
+      return
+    }
+    const job = getJob(pairOf(pairName).jobId)
+    if (job === undefined) throw new Error('seed job missing')
+    let usage: AiUsage | null = null
+    let failure: AiFailureDiagnostic | null = null
+    let advice: AdviceStats | null = null
+    const startedAt = performance.now()
+    let row: AdviceCheckRow
+    try {
+      const response = await analyzeFit({
+        ai,
+        job,
+        resumeText,
+        signal: new AbortController().signal,
+        now: () => Date.now(),
+        overrides,
+        onUsage: (reported) => {
+          usage = reported
+        },
+        onFailure: (reported) => {
+          failure = reported
+        },
+        onAdviceStats: (reported) => {
+          advice = reported
+        },
+      })
+      row = {
+        pair: pairName,
+        ok: true,
+        errorCode: null,
+        failure: null,
+        wallMs: Math.round(performance.now() - startedAt),
+        usage,
+        gaps: response.ratings.filter((rated) => rated.rating !== 'met').length,
+        quoteRejected: response.ratings.filter((rated) => rated.quoteRejected).length,
+        advice,
+      }
+      consecutiveFailures = 0
+    } catch (error) {
+      row = {
+        pair: pairName,
+        ok: false,
+        errorCode: error instanceof AppError ? error.code : 'unexpected_error',
+        failure,
+        wallMs: Math.round(performance.now() - startedAt),
+        usage,
+        gaps: null,
+        quoteRejected: null,
+        advice: null,
+      }
+      consecutiveFailures += 1
+    }
+    rows.push(row)
+    log(
+      `[${String(rows.length)}/${String(requestCap)}] ${plan} ${pairName} ${
+        row.ok ? 'ok' : failureText(row)
+      } ${String(row.wallMs)}ms`,
+    )
+  }
+
+  for (const pairName of scheduleFor(plan)) await callOnce(pairName)
+
+  return summariseAdviceCheck({ mode, plan, requestCap, stoppedEarly, rows })
+}
+
+export type SpikeMode =
+  'check-config' | 'dry-run' | 'live' | 'smoke' | 'advice' | 'dry-run-smoke' | 'dry-run-advice'
 
 export const USAGE = [
   'usage: npm --prefix server run spike:live -- <option>',
   '  --live          paid calls to Google, run it by hand, once',
   '  --dry-run       rehearse against the stand-in, no key, nothing sent',
   '  --check-config  print whether a key is configured',
+  '  --smoke         LIVE: 1 paid request, checks that Google accepts the answer schema',
+  '  --advice        LIVE: 8 paid requests, measures the size and time of the larger answer',
+  '  --dry-run-smoke   rehearse --smoke against the stand-in, no key, nothing sent',
+  '  --dry-run-advice  rehearse --advice against the stand-in, no key, nothing sent',
 ].join('\n')
 
-// Only the three known flags are accepted, one at a time. No flag and a typo both return null, so
-// neither can fall through into a paid run: a live run is always an explicit --live.
+// Only the known flags are accepted, one at a time. No flag and a typo both return null, so
+// neither can fall through into a paid run: a live run is always an explicit --live, --smoke or
+// --advice.
 export function parseMode(args: readonly string[]): SpikeMode | null {
   const [only] = args
   if (args.length === 1 && only === '--live') return 'live'
   if (args.length === 1 && only === '--check-config') return 'check-config'
   if (args.length === 1 && only === '--dry-run') return 'dry-run'
+  if (args.length === 1 && only === '--smoke') return 'smoke'
+  if (args.length === 1 && only === '--advice') return 'advice'
+  if (args.length === 1 && only === '--dry-run-smoke') return 'dry-run-smoke'
+  if (args.length === 1 && only === '--dry-run-advice') return 'dry-run-advice'
   return null
 }
 
@@ -456,6 +714,26 @@ async function main(): Promise<void> {
     return
   }
 
+  if (mode === 'dry-run-smoke' || mode === 'dry-run-advice') {
+    const { startFakeGemini } = await import('../test-support/fake-gemini')
+    const fake = await startFakeGemini()
+    try {
+      const ai = createGeminiClient({ apiKey: 'dry-run-key', baseUrl: fake.url })
+      const summary = await runAdviceCheck({
+        ai,
+        resumeText: readResume(),
+        mode: 'dry-run',
+        plan: mode === 'dry-run-smoke' ? 'smoke' : 'advice',
+        log: progress,
+      })
+      console.log(JSON.stringify(summary, null, 2))
+      console.log('dry-run complete')
+    } finally {
+      await fake.close()
+    }
+    return
+  }
+
   const env = loadEnvOrNull()
   if (env === null) {
     console.error('refused: the server environment could not be read')
@@ -476,6 +754,19 @@ async function main(): Promise<void> {
   }
 
   const ai = createGeminiClient({ apiKey: env.geminiApiKey })
+  if (mode === 'smoke' || mode === 'advice') {
+    const summary = await runAdviceCheck({
+      ai,
+      resumeText: readResume(),
+      mode: 'live',
+      plan: mode,
+      log: progress,
+    })
+    console.log(JSON.stringify(summary, null, 2))
+    console.log(mode === 'smoke' ? 'smoke complete' : 'advice measurement complete')
+    return
+  }
+
   const summary = await runSpike({ ai, resumeText: readResume(), mode, log: progress })
   console.log(JSON.stringify(summary, null, 2))
   console.log('live run complete')

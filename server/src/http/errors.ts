@@ -1,6 +1,7 @@
 import type { ErrorRequestHandler, RequestHandler } from 'express'
 import { z } from 'zod'
 
+import { ERROR_MESSAGES } from '@jobs-workspace/shared'
 import type { ApiErrorBody, ErrorCode } from '@jobs-workspace/shared'
 
 interface ErrorShape {
@@ -10,6 +11,15 @@ interface ErrorShape {
 
 const ERROR_TABLE: Record<ErrorCode, ErrorShape> = {
   ai_not_configured: { status: 503, retryable: false },
+  ai_auth_failed: { status: 502, retryable: false },
+  ai_billing: { status: 502, retryable: false },
+  ai_rate_limited: { status: 429, retryable: true },
+  ai_overloaded: { status: 502, retryable: true },
+  ai_timeout: { status: 504, retryable: true },
+  ai_network: { status: 502, retryable: true },
+  ai_blocked: { status: 422, retryable: false },
+  ai_truncated: { status: 502, retryable: true },
+  ai_invalid_output: { status: 502, retryable: true },
   ai_failed: { status: 502, retryable: true },
   validation_error: { status: 400, retryable: false },
   not_found: { status: 404, retryable: false },
@@ -20,15 +30,6 @@ const ERROR_TABLE: Record<ErrorCode, ErrorShape> = {
   internal_error: { status: 500, retryable: true },
 }
 
-// Phase 1 has one generic retryable message on purpose; the full table is Phase 01.1.
-const NOT_CONFIGURED_MESSAGE =
-  'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server.'
-const GENERIC_MESSAGE = 'Something went wrong on our side. Try again.'
-
-function publicMessage(code: ErrorCode): string {
-  return code === 'ai_not_configured' ? NOT_CONFIGURED_MESSAGE : GENERIC_MESSAGE
-}
-
 // An error the route layer chose to send. The message is fixed per code, so nothing from a
 // request, a resume or a model answer can end up in a response through it.
 export class AppError extends Error {
@@ -37,7 +38,7 @@ export class AppError extends Error {
   readonly retryable: boolean
 
   constructor(code: ErrorCode) {
-    super(publicMessage(code))
+    super(ERROR_MESSAGES[code])
     this.name = 'AppError'
     this.code = code
     this.status = ERROR_TABLE[code].status

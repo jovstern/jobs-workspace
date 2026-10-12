@@ -11,7 +11,7 @@
     {
       "number": "01.1",
       "name": "Gaps, learning plan, tips and failure handling",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "01.2",
@@ -51,8 +51,8 @@
   ],
   "next": {
     "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 01.1)",
-    "reason": "Phase 01.1 of 9 — needs a plan"
+    "label": "Advance to the next step (plan phase 01.2)",
+    "reason": "Phase 01.2 of 9 — needs a plan"
   },
-  "updated_at": "2026-10-11T13:29:25.794Z"
+  "updated_at": "2026-10-12T13:10:27.620Z"
 }

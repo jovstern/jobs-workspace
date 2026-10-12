@@ -1,4 +1,9 @@
-import { FIT_SCHEMA_VERSION, fitResponseSchema, jobSchema } from '@jobs-workspace/shared'
+import {
+  FIT_SCHEMA_VERSION,
+  fitResponseSchema,
+  jobSchema,
+  RATING_QUOTE_MAX_CHARS,
+} from '@jobs-workspace/shared'
 import type { Job } from '@jobs-workspace/shared'
 import { describe, expect, test } from 'vitest'
 
@@ -155,8 +160,113 @@ describe('good model output', () => {
       promptVersion: FIT_PROMPT_VERSION,
       schemaVersion: FIT_SCHEMA_VERSION,
       analysedAt: new Date(NOW).toISOString(),
-      advice: null,
+      advice: { plans: [], tailoring: null },
     })
+  })
+})
+
+interface RawPlan {
+  requirementId: string
+  steps: string[]
+  whyItMatters: string
+  effort: string
+}
+
+function plan(requirementId: string, overrides: Partial<RawPlan> = {}): RawPlan {
+  return {
+    requirementId,
+    steps: [`Read the guide for ${requirementId}.`, `Build a small example for ${requirementId}.`],
+    whyItMatters: 'The role relies on it.',
+    effort: 'weeks',
+    ...overrides,
+  }
+}
+
+describe('the learning plans in the advice', () => {
+  test('come back in posting order, one per gap, even when the model reversed them', async () => {
+    const { response } = await run(goodRatings(), RESUME, {
+      plans: [plan('a-r6'), plan('a-r5'), plan('a-r3')],
+    })
+
+    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual([
+      'a-r3',
+      'a-r5',
+      'a-r6',
+    ])
+    expect(response.advice?.tailoring).toBeNull()
+  })
+
+  test('a plan for a requirement rated met, or for an id the job does not have, is dropped', async () => {
+    const { response } = await run(goodRatings(), RESUME, {
+      plans: [plan('a-r1'), plan('zz-r9'), plan('a-r3')],
+    })
+
+    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual(['a-r3'])
+  })
+
+  test('a met rating withdrawn for an unverifiable quote becomes a gap that can have a plan', async () => {
+    const ratings = goodRatings()
+    ratings[0] = rating('a-r1', 'met', 'Led a company-wide platform migration to Kubernetes')
+
+    const { response } = await run(ratings, RESUME, { plans: [plan('a-r1')] })
+
+    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual(['a-r1'])
+  })
+
+  test('the second plan for one requirement is ignored', async () => {
+    const { response } = await run(goodRatings(), RESUME, {
+      plans: [plan('a-r3', { whyItMatters: 'first' }), plan('a-r3', { whyItMatters: 'second' })],
+    })
+
+    expect(response.advice?.plans).toHaveLength(1)
+    expect(response.advice?.plans[0]?.whyItMatters).toBe('first')
+  })
+
+  test('a plan that breaks a limit is dropped and the others stay; extra steps are cut to four', async () => {
+    const { response } = await run(goodRatings(), RESUME, {
+      plans: [
+        plan('a-r3', { steps: ['a', 'b', 'c', 'd', 'e'] }),
+        plan('a-r5', { effort: 'years' }),
+        plan('a-r6'),
+      ],
+    })
+
+    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual(['a-r3', 'a-r6'])
+    expect(response.advice?.plans[0]?.steps).toEqual(['a', 'b', 'c', 'd'])
+  })
+
+  test('plans that are not a list give no plans and leave all six ratings unchanged', async () => {
+    const baseline = await run(goodRatings())
+
+    const { response } = await run(goodRatings(), RESUME, {
+      plans: 'x',
+      tailoring: ['not an object'],
+    })
+
+    expect(response.advice).toEqual({ plans: [], tailoring: null })
+    expect(response.ratings).toEqual(baseline.response.ratings)
+    expect(response.ratings).toHaveLength(6)
+  })
+
+  test('the stats callback receives numbers and flags only, never any text', async () => {
+    const stats: unknown[] = []
+    const fake = fakeAi(goodRatings(), { plans: [plan('a-r3'), plan('a-r1')] })
+
+    await analyzeFit({
+      ai: fake.ai,
+      job: JOB,
+      resumeText: RESUME,
+      signal: new AbortController().signal,
+      now: () => NOW,
+      onAdviceStats: (entry) => stats.push(entry),
+    })
+
+    expect(stats).toHaveLength(1)
+    const [entry] = stats as Record<string, unknown>[]
+    expect(entry).toMatchObject({ plansReceived: 2, plansKept: 1 })
+    for (const value of Object.values(entry ?? {})) {
+      expect(['number', 'boolean']).toContain(typeof value)
+    }
   })
 })
 
@@ -208,6 +318,38 @@ describe('a quote that cannot be found in the resume', () => {
       rationale: '',
       quoteRejected: true,
     })
+  })
+
+  test('a quote over the length bound is withdrawn even though it occurs in the resume', async () => {
+    const longLine = `Built React applications ${'for many customers across regions '.repeat(25)}`
+    const resume = `${RESUME}\n${longLine}`
+    expect(longLine.length).toBeGreaterThan(RATING_QUOTE_MAX_CHARS)
+    const ratings = goodRatings()
+    ratings[0] = rating('a-r1', 'met', longLine)
+
+    const { response } = await run(ratings, resume)
+
+    expect(byId(response, 'a-r1')).toEqual({
+      requirementId: 'a-r1',
+      rating: 'not_evidenced',
+      quote: null,
+      rationale: '',
+      quoteRejected: true,
+    })
+  })
+
+  test('a quote exactly at the length bound is kept', async () => {
+    // Words only, so the quote is exactly the bound long and does not end in a space.
+    const atBound =
+      'React '.repeat(RATING_QUOTE_MAX_CHARS).slice(0, RATING_QUOTE_MAX_CHARS - 1) + 'x'
+    expect(atBound).toHaveLength(RATING_QUOTE_MAX_CHARS)
+    const resume = `${RESUME}\n${atBound}`
+    const ratings = goodRatings()
+    ratings[0] = rating('a-r1', 'met', atBound)
+
+    const { response } = await run(ratings, resume)
+
+    expect(byId(response, 'a-r1')).toMatchObject({ rating: 'met', quote: atBound })
   })
 
   test('a partial rating with a null quote gives the same result', async () => {
@@ -359,13 +501,15 @@ describe('what is asked of the model', () => {
     const call = firstCall(calls)
     expect(call.task).toBe('fit')
     expect(call.system.startsWith('TASK: fit-ratings')).toBe(true)
-    expect(JSON.stringify(toGeminiSchema(call.schema))).toContain('a-r6')
+    expect(JSON.stringify(toGeminiSchema(call.wireSchema ?? call.schema))).toContain('a-r6')
   })
 
   test('the schema has no score, band or percentage', async () => {
     const { calls } = await run(goodRatings())
 
-    const schema = JSON.stringify(toGeminiSchema(firstCall(calls).schema)).toLowerCase()
+    const schema = JSON.stringify(
+      toGeminiSchema(firstCall(calls).wireSchema ?? firstCall(calls).schema),
+    ).toLowerCase()
     for (const word of ['score', 'band', 'percent']) expect(schema).not.toContain(word)
   })
 

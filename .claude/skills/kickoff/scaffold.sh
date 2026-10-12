@@ -32,6 +32,13 @@ TEMPLATE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/template"
   echo "create $target"
 done
 
+# Cap the context window: without this, sessions and subagents grow toward 1M tokens.
+if [ ! -e .claude/settings.json ]; then
+  mkdir -p .claude
+  cp "$(dirname "$TEMPLATE")/claude-settings.json" .claude/settings.json
+  echo "create .claude/settings.json"
+fi
+
 npm install
 npx lefthook install
 npx playwright install chromium

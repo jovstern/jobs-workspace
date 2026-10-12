@@ -113,3 +113,39 @@ test('rejects text under 50 characters after trimming with the shared message', 
     'Paste at least 50 characters of resume text.',
   )
 })
+
+async function loadWithIncidents() {
+  const resume = await loadModule()
+  const incidents = (await import('../../lib/storage-incidents')).useStorageIncidents
+  return { useResumeStore: resume.useResumeStore, incidents }
+}
+
+function copyKeys(): string[] {
+  return Object.keys(localStorage).filter((key) => key.startsWith('jw:resume:corrupt:'))
+}
+
+test.each([
+  [
+    'a value of the wrong shape',
+    JSON.stringify({ state: { resume: { text: 'short' } }, version: 1 }),
+    'unreadable',
+  ],
+  ['text that is not JSON', '[1,2,3', 'unreadable'],
+  ['an array', '[1,2,3]', 'unreadable'],
+  ['a newer version', JSON.stringify({ state: { resume: null }, version: 2 }), 'newer'],
+])(
+  '%s is set aside under jw:resume:corrupt: with one incident, and the resume starts empty',
+  async (_name, raw, kind) => {
+    localStorage.setItem('jw:resume', raw)
+
+    const { useResumeStore, incidents } = await loadWithIncidents()
+
+    expect(useResumeStore.getState().resume).toBeNull()
+    expect(copyKeys()).toHaveLength(1)
+    expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe(raw)
+    expect(localStorage.getItem('jw:resume')).toBeNull()
+    expect(incidents.getState().incidents).toMatchObject([
+      { store: 'resume', kind, copyKept: true },
+    ])
+  },
+)

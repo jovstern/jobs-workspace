@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 
 import { Card } from './components/Card'
 import { JobDetail } from './features/jobs-stub/JobDetail'
@@ -7,6 +7,7 @@ import { JobPicker } from './features/jobs-stub/JobPicker'
 import { jobsQueryOptions } from './features/jobs-stub/queries'
 import { ResumeCard } from './features/resume/ResumeCard'
 import { useResumeStore } from './features/resume/resume-store'
+import { StorageNotice } from './features/storage-notice/StorageNotice'
 
 const HEADING = 'text-xl leading-[1.2] font-semibold text-gray-900'
 
@@ -15,6 +16,7 @@ const HEADING = 'text-xl leading-[1.2] font-semibold text-gray-900'
 // Below the lg breakpoint the layout is one column with the jobs list first.
 export function App() {
   const emptyHeadingId = useId()
+  const pageHeadingRef = useRef<HTMLHeadingElement>(null)
   const resume = useResumeStore((state) => state.resume)
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null)
   const jobs = useQuery(jobsQueryOptions)
@@ -23,8 +25,15 @@ export function App() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
       <div className="mx-auto max-w-5xl px-6 py-8">
+        <StorageNotice
+          onDismiss={() => {
+            pageHeadingRef.current?.focus()
+          }}
+        />
         <header>
-          <h1 className={HEADING}>Jobs Workspace</h1>
+          <h1 ref={pageHeadingRef} tabIndex={-1} className={HEADING}>
+            Jobs Workspace
+          </h1>
           <p className="mt-1 text-base text-gray-600">
             Pick a job to see how your resume matches its requirements.
           </p>

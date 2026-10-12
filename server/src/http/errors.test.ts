@@ -4,12 +4,40 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { apiErrorSchema } from '@jobs-workspace/shared'
+import {
+  apiErrorSchema,
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  GENERIC_NOT_RETRYABLE_MESSAGE,
+  type ErrorCode,
+} from '@jobs-workspace/shared'
 import express from 'express'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 
 import { createApp } from '../app'
-import { errorHandler, notFoundHandler } from './errors'
+import { AppError, errorHandler, notFoundHandler } from './errors'
+
+// The status and the retry flag of every code, written out so a change to either is deliberate.
+const EXPECTED: Record<ErrorCode, { status: number; retryable: boolean }> = {
+  ai_not_configured: { status: 503, retryable: false },
+  ai_auth_failed: { status: 502, retryable: false },
+  ai_billing: { status: 502, retryable: false },
+  ai_rate_limited: { status: 429, retryable: true },
+  ai_overloaded: { status: 502, retryable: true },
+  ai_timeout: { status: 504, retryable: true },
+  ai_network: { status: 502, retryable: true },
+  ai_blocked: { status: 422, retryable: false },
+  ai_truncated: { status: 502, retryable: true },
+  ai_invalid_output: { status: 502, retryable: true },
+  ai_failed: { status: 502, retryable: true },
+  validation_error: { status: 400, retryable: false },
+  not_found: { status: 404, retryable: false },
+  too_many_requests: { status: 429, retryable: true },
+  forbidden_origin: { status: 403, retryable: false },
+  unsupported_media_type: { status: 415, retryable: false },
+  payload_too_large: { status: 413, retryable: false },
+  internal_error: { status: 500, retryable: true },
+}
 
 let server: Server
 let url: string
@@ -45,6 +73,30 @@ describe('error bodies', () => {
     expect(body.error.code).toBe('internal_error')
     expect(body.error.message).toBe('Something went wrong on our side. Try again.')
     expect(text).not.toContain('secret detail')
+  })
+
+  test('an unknown route answers 404 not_found with the not-retryable sentence', async () => {
+    const response = await fetch(`${url}/nowhere`)
+
+    expect(response.status).toBe(404)
+    const { error } = apiErrorSchema.parse(await response.json())
+    expect(error.code).toBe('not_found')
+    expect(error.message).toBe(GENERIC_NOT_RETRYABLE_MESSAGE)
+    expect(error.retryable).toBe(false)
+  })
+})
+
+describe('AppError', () => {
+  test('the table above names every code', () => {
+    expect(Object.keys(EXPECTED).sort()).toEqual([...ERROR_CODES].sort())
+  })
+
+  test.each(ERROR_CODES)('%s has its status, retry flag and the fixed sentence', (code) => {
+    const error = new AppError(code)
+
+    expect(error.status).toBe(EXPECTED[code].status)
+    expect(error.retryable).toBe(EXPECTED[code].retryable)
+    expect(error.message).toBe(ERROR_MESSAGES[code])
   })
 })
 

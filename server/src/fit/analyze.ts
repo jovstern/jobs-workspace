@@ -1,4 +1,8 @@
-import { FIT_SCHEMA_VERSION, fitResponseSchema } from '@jobs-workspace/shared'
+import {
+  FIT_SCHEMA_VERSION,
+  fitResponseSchema,
+  RATING_QUOTE_MAX_CHARS,
+} from '@jobs-workspace/shared'
 import type { FitResponse, Job, RatedRequirement } from '@jobs-workspace/shared'
 import type { z } from 'zod'
 
@@ -9,8 +13,11 @@ import {
   FIT_PROMPT_VERSION,
   FIT_SYSTEM_INSTRUCTION,
   fitModelOutputSchema,
+  fitModelParseSchema,
 } from '../ai/prompts/fit'
 import { MODELS } from '../config/models'
+import { buildAdvice } from './advice'
+import type { AdviceStats } from './advice'
 import { buildResumeIndex, verifyQuote } from './quotes'
 import type { ResumeIndex } from './quotes'
 
@@ -25,9 +32,11 @@ export interface AnalyzeFitInput {
   overrides?: GenerateJsonRequest<unknown>['overrides']
   onUsage?: (usage: AiUsage) => void
   onFailure?: GenerateJsonRequest<unknown>['onFailure']
+  // Counts only, for the spike script. The route never passes it and nothing logs it.
+  onAdviceStats?: (stats: AdviceStats) => void
 }
 
-type ModelRating = z.infer<ReturnType<typeof fitModelOutputSchema>>['ratings'][number]
+type ModelRating = z.infer<ReturnType<typeof fitModelParseSchema>>['ratings'][number]
 
 function notEvidenced(requirementId: string, rationale: string, quoteRejected: boolean) {
   return {
@@ -46,7 +55,13 @@ function settle(requirementId: string, rated: ModelRating | undefined, index: Re
   if (rated === undefined) return notEvidenced(requirementId, '', false)
   const rationale = rated.rationale.slice(0, RATIONALE_MAX)
   if (rated.rating === 'not_evidenced') return notEvidenced(requirementId, rationale, false)
-  if (rated.quote === null || !verifyQuote(rated.quote, index)) {
+  // A quote longer than the bound is treated like one that cannot be verified: the prompt asks
+  // for 25 words, and the stored result must not carry large blocks of the resume.
+  if (
+    rated.quote === null ||
+    rated.quote.length > RATING_QUOTE_MAX_CHARS ||
+    !verifyQuote(rated.quote, index)
+  ) {
     return notEvidenced(requirementId, '', true)
   }
   return {
@@ -62,9 +77,10 @@ function settle(requirementId: string, rated: ModelRating | undefined, index: Re
 // answer with the job's fixed requirement list, verify every quote against the text that was
 // sent, and build the response in posting order. The model is called exactly once; a rejected
 // quote is never retried, because every call is paid. Nothing here is logged: the resume, the
-// quotes and the model output stay inside this function.
+// quotes and the model output stay inside this function. Advice is built from the final ratings
+// and can never fail the response: unusable plans become "no plans".
 export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
-  const { ai, job, resumeText, signal, now, overrides, onUsage, onFailure } = input
+  const { ai, job, resumeText, signal, now, overrides, onUsage, onFailure, onAdviceStats } = input
 
   // The same string is sent and verified against, so the prompt and the check see the same text.
   const prepared = prepareResumeForModel(resumeText)
@@ -74,7 +90,10 @@ export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
     task: 'fit',
     system: FIT_SYSTEM_INSTRUCTION,
     userText: buildFitUserTurn(job, prepared),
-    schema: fitModelOutputSchema(ids),
+    // The provider is shown the strict wire schema; the answer is read with the lenient one, so a
+    // malformed plan can never cost the user their ratings.
+    schema: fitModelParseSchema(ids),
+    wireSchema: fitModelOutputSchema(ids),
     signal,
     overrides,
     onUsage,
@@ -90,6 +109,15 @@ export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
   const index = buildResumeIndex(prepared)
   const ratings = ids.map((id) => settle(id, answers.get(id), index))
 
+  const { advice, stats } = buildAdvice({
+    rawPlans: output.plans,
+    rawTailoring: output.tailoring,
+    job,
+    ratings,
+    index,
+  })
+  onAdviceStats?.(stats)
+
   return fitResponseSchema.parse({
     jobId: job.id,
     jobContentVersion: job.contentVersion,
@@ -98,6 +126,6 @@ export async function analyzeFit(input: AnalyzeFitInput): Promise<FitResponse> {
     schemaVersion: FIT_SCHEMA_VERSION,
     analysedAt: new Date(now()).toISOString(),
     ratings,
-    advice: null,
+    advice,
   })
 }

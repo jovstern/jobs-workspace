@@ -1,19 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: "01.1"
-current_phase_name: Gaps, learning plan, tips and failure handling
-status: planning
-stopped_at: Phase 01 complete, ready to plan Phase 01.1
-last_updated: "2026-10-11T13:29:25.769Z"
-last_activity: 2026-10-11
-last_activity_desc: Phase 01 complete, transitioned to Phase 01.1
-state_head: cd2a7348509c87ffac472851948f22e167edfcec
+current_phase: "01.2"
+current_phase_name: Resume upload, review and lifecycle
+status: "Phase 01.1 shipped — PR #8"
+stopped_at: Phase 01.1 complete, ready to plan Phase 01.2
+last_updated: "2026-10-12T13:12:17.791Z"
+last_activity: 2026-10-12
+state_head: 7165a833579ad768e887a9ce3fe9847dcf8c2ef2
 progress:
   total_phases: 9
-  completed_phases: 1
-  total_plans: 11
-  completed_plans: 11
-  percent: 11
+  completed_phases: 2
+  total_plans: 20
+  completed_plans: 20
+  percent: 22
 ---
 
 # Project State
@@ -23,21 +22,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10)
 
 **Core value:** The user can search for jobs and see and update the progress of every application on the same page, without ever losing their search context.
-**Current focus:** Phase 01 — Real AI path, end to end
+**Current focus:** Phase 01.1 — Gaps, learning plan, tips and failure handling (INSERTED)
 
 ## Current Position
 
-Phase: 01.1 — Gaps, learning plan, tips and failure handling
+Phase: 01.2 — Resume upload, review and lifecycle
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-11 — Phase 01 complete, transitioned to Phase 01.1
+Status: Phase 01.1 shipped — PR #8
+Last activity: 2026-10-12
 
-Progress: [█░░░░░░░░░] 11%
+Progress: [██░░░░░░░░] 22%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 20
 - Average duration: - min
 - Total execution time: 0.0 hours
 
@@ -46,6 +45,7 @@ Progress: [█░░░░░░░░░] 11%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 11 | - | - |
+| 01.1 | 9 | - | - |
 
 **Recent Trend:**
 - Last 5 plans: none yet
@@ -67,6 +67,15 @@ Progress: [█░░░░░░░░░] 11%
 | Phase 01 P10 | 17 min | 3 tasks | 13 files |
 | Phase 01 P11 | 25 min | 3 tasks | 9 files |
 | Phase 01 P09 | 256 min | 3 tasks | 11 files |
+| Phase 01.1 P01 | unrecorded | 2 tasks | 14 files |
+| Phase 01.1 P09 | 3 min | 2 tasks | 7 files |
+| Phase 01.1 P02 | unrecorded | 3 tasks | 10 files |
+| Phase 01.1 P03 | 8min | 2 tasks | 9 files |
+| Phase 01.1 P04 | 8 min | 3 tasks | 14 files |
+| Phase 01.1 P05 | 11 min | 3 tasks | 8 files |
+| Phase 01.1 P06 | 10 min | 2 tasks | 6 files |
+| Phase 01.1 P08 | n/a | 3 tasks | 11 files |
+| Phase 01.1 P07 | short | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -104,6 +113,17 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-09: LOW thinking chosen from live measurements (p90 4698 ms, 6/6 required met near-perfect, 0 met poor, 0 flips); MEDIUM p90 16900 ms missed the 15 s target and HIGH failed 3 of 6 calls at 60 s
 - [Phase 01]: 01-09: MODELS.fit output cap 4096 and deadline 30000 ms follow from the stated rule (floors apply) and were not tested directly; the spike ran at 16384 and 60000
 - [Phase 01]: 01-09: failure diagnostics are a closed vocabulary (status number, category, class name from fixed lists) and are surfaced only in the spike; the route and request log are unchanged
+- [Phase 01.1]: Advice is stored as adviceSchema.nullable(); schema version stays 1 so older records remain valid
+- [Phase 01.1]: Strict wire schema for the provider, lenient parse schema for the answer; buildAdvice validates plans and never fails the response
+- [Phase 01.1]: 01.1-09: failureToErrorCode reads only status and category; upstream 504 is ai_overloaded, ai_timeout is the app's own deadline
+- [Phase 01.1]: 01.1-02: notice Check again and Check my fit share one pending-focus ref; focus goes to the header Check again button, with no effect in FitPanel
+- [Phase 01.1]: 01.1-03: one surviving plan step keeps the plan; steps beyond four are cut, not the plan dropped
+- [Phase 01.1]: 01.1-03: link regex tightened for data: URLs; 12-name learning-platform deny-list kept as best-effort
+- [Phase 01.1]: 01.1-04: saved-data detection lives in a guarded PersistStorage getItem; set-aside copies keyed {store}:corrupt:{ISO}, 3 kept per store; persist versions stay 1
+- [Phase 01.1]: Plan 05: stand-in scenarios ship in each task's RED commit (test support the pre-commit typecheck needs); SCENARIOS is exported so the route test fails if a scenario is left unclassified
+- [Phase 01.1]: Plan 06: the whole TailoringSection, with every empty and unavailable state, was built in the tracer task; the second task added the state tests (checked by mutation) because the states share the same JSX
+- [Phase 01.1]: Plan 01.1-08: browser-only codes server_unreachable and request_timeout are a two-entry table in fit-errors.ts; the retry flag is always the envelope's, never derived from the code
+- [Phase 01.1]: 01.1-07: user declined every paid call; 0 requests sent; schema acceptance (A4) and latency and size (A2, A3) stay open and unverified; defaults stand
 
 ### Pending Todos
 
@@ -130,6 +150,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T12:41:13.465Z
-Stopped at: Phase 01 complete, ready to plan Phase 01.1
+Last session: 2026-10-12T12:20:24.530Z
+Stopped at: Phase 01.1 complete, ready to plan Phase 01.2
 Resume file: None

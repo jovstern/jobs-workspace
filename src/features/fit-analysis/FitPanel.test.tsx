@@ -1,4 +1,5 @@
-import type { FitResponse, Job, Rating } from '@jobs-workspace/shared'
+import type { Advice, FitResponse, Job, Rating } from '@jobs-workspace/shared'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -6,6 +7,7 @@ import type { Mock } from 'vitest'
 
 import { renderWithQuery } from '../../test/render'
 import { FitPanel } from './FitPanel'
+import { FIT_REASSURANCE } from './progress-lines'
 import { useFitStore } from './fit-store'
 
 const HASH = 'a'.repeat(64)
@@ -16,6 +18,8 @@ const RESUME = {
 
 const NO_RESUME_TEXT = 'Add your resume to check your fit.'
 const GENERIC_ERROR = 'Something went wrong on our side. Try again.'
+const RATE_LIMITED =
+  "Google's AI is rate limiting this key. Wait a while, then try again. If it keeps happening, a daily quota may be used up: check your usage in Google AI Studio."
 const NOT_CONFIGURED = 'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server.'
 const REJECTED =
   'The AI cited text we could not find in your resume, so this was marked not evidenced.'
@@ -58,6 +62,7 @@ function fitResponse(
   required: Rating[],
   nice: Rating[] = ['not_evidenced', 'not_evidenced'],
   overrides: Record<string, RatingOverride> = {},
+  advice: Advice | null = null,
 ): FitResponse {
   const ids = [...REQUIRED_IDS, ...NICE_IDS]
   const all = [...required, ...nice]
@@ -79,7 +84,7 @@ function fitResponse(
         ...overrides[id],
       }
     }),
-    advice: null,
+    advice,
   }
 }
 
@@ -96,8 +101,8 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
-function errorResponse(code: string, status: number) {
-  return jsonResponse({ error: { code, message: 'Server wording.', retryable: true } }, status)
+function errorResponse(code: string, status: number, retryable = true) {
+  return jsonResponse({ error: { code, message: 'Server wording.', retryable } }, status)
 }
 
 let fetchMock: Mock<typeof fetch>
@@ -107,6 +112,11 @@ function at<T>(items: readonly T[], index: number): T {
   const found = items[index]
   if (found === undefined) throw new Error(`No item at index ${String(index)}`)
   return found
+}
+
+// The panel's own announcement region is the first status in the page; a notice may add another.
+function liveRegion() {
+  return at(screen.getAllByRole('status'), 0)
 }
 
 function answerWith(response: FitResponse) {
@@ -192,9 +202,6 @@ test('a click sends one POST and, while it runs, shows progress and ignores a se
     expect(button).toHaveAttribute('aria-disabled', 'true')
   })
   expect(button).toHaveTextContent('Check my fit')
-  const status = screen.getByRole('status')
-  expect(status).toHaveTextContent('Checking your fit')
-  expect(status).toHaveTextContent('Usually 10 to 20 seconds.')
   const bar = screen.getByRole('progressbar', { name: 'Checking your fit' })
   expect(bar).not.toHaveAttribute('aria-valuenow')
 
@@ -211,6 +218,52 @@ test('a click sends one POST and, while it runs, shows progress and ignores a se
 
   finish(jsonResponse(fitResponse(FIVE_MET_ONE_PARTIAL)))
   expect(await screen.findByRole('button', { name: 'Check again' })).toBeInTheDocument()
+})
+
+test('while a check runs the status region holds only the stage line, the rest sits outside it', async () => {
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const heading = await screen.findByText('Checking your fit', { selector: 'p' })
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Reading your resume')
+  expect(status).not.toContainElement(heading)
+  const reassurance = screen.getByText(FIT_REASSURANCE)
+  expect(status).not.toContainElement(reassurance)
+  expect(screen.getByRole('progressbar', { name: 'Checking your fit' })).toBeInTheDocument()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+})
+
+test('while a check runs the result, the old-result notice and the error notice are absent', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  await screen.findByRole('progressbar', { name: 'Checking your fit' })
+  expect(screen.queryByText('83%')).not.toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  const action = screen.getByRole('button', { name: 'Check again' })
+  expect(action).toHaveAttribute('aria-disabled', 'true')
+  expect(action).toHaveTextContent('Check again')
+})
+
+test('after a failed check the status region is empty and the alert shows', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  expect(await screen.findByRole('alert')).toBeInTheDocument()
+  expect(screen.getByRole('status').textContent).toBe('')
 })
 
 test('a finished check shows the score block, announces it, and moves focus to Check again', async () => {
@@ -232,9 +285,7 @@ test('a finished check shows the score block, announces it, and moves focus to C
   expect(screen.getByText('5 of 6 required requirements met')).toBeInTheDocument()
   expect(screen.getByText(DISCLAIMER)).toBeInTheDocument()
   expect(screen.getByText('Checked 11 Oct 2026. Saved in this browser.')).toBeInTheDocument()
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'Fit check complete. Fit estimate 83%, Strong fit.',
-  )
+  expect(liveRegion()).toHaveTextContent('Fit check complete. Fit estimate 83%, Strong fit.')
   expect(useFitStore.getState().byJobId[JOB.id]?.resumeHash).toBe(HASH)
 })
 
@@ -296,8 +347,8 @@ test('a rating whose quote was rejected shows Not evidenced and the explanation'
   expect(within(item).queryByRole('blockquote')).not.toBeInTheDocument()
 })
 
-test('a failed check shows one alert with a Try again that repeats the request on click only', async () => {
-  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_overloaded', 503)))
+test("a rate-limited check shows Google's sentence and a Try again that repeats the request on click only", async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
   const user = userEvent.setup()
   renderPanel()
 
@@ -305,21 +356,80 @@ test('a failed check shows one alert with a Try again that repeats the request o
 
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent('Could not check your fit')
-  expect(alert).toHaveTextContent(GENERIC_ERROR)
+  expect(alert).toHaveTextContent(RATE_LIMITED)
   expect(alert).not.toHaveTextContent('Server wording.')
+  expect(screen.queryByText('Server wording.')).not.toBeInTheDocument()
   expect(screen.getAllByRole('alert')).toHaveLength(1)
+  // Nothing retries by itself: one POST so far.
   expect(fetchMock).toHaveBeenCalledTimes(1)
 
+  const firstBody = at(fetchMock.mock.calls, 0)[1]?.body
   answerWith(fitResponse(FIVE_MET_ONE_PARTIAL))
   await user.click(within(alert).getByRole('button', { name: 'Try again' }))
 
   expect(await screen.findByText('83%')).toBeInTheDocument()
   expect(fetchMock).toHaveBeenCalledTimes(2)
+  expect(at(fetchMock.mock.calls, 1)[1]?.body).toBe(firstBody)
   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
 })
 
+test('Try again sends the current resume, not the one from the failed attempt', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
+  const user = userEvent.setup()
+  const view = renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+  const alert = await screen.findByRole('alert')
+
+  const replaced = {
+    text: 'Sam Sample replaced the resume after the failure.',
+    textHash: 'b'.repeat(64),
+  }
+  view.rerender(
+    <QueryClientProvider client={view.client}>
+      <FitPanel job={JOB} resume={replaced} />
+    </QueryClientProvider>,
+  )
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL))
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  const body = at(fetchMock.mock.calls, 1)[1]?.body
+  if (typeof body !== 'string') throw new Error('The request body is not a string')
+  expect(body).toContain(replaced.text)
+  expect(body).not.toContain('Alex Sample')
+})
+
+test('Try again sends nothing once the resume is gone or the panel is unavailable', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
+  const user = userEvent.setup()
+  const view = renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+  const alert = await screen.findByRole('alert')
+
+  view.rerender(
+    <QueryClientProvider client={view.client}>
+      <FitPanel job={JOB} resume={null} />
+    </QueryClientProvider>,
+  )
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+  view.rerender(
+    <QueryClientProvider client={view.client}>
+      <FitPanel job={JOB} resume={RESUME} unavailableReason="The AI service is not available." />
+    </QueryClientProvider>,
+  )
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
 test('an unconfigured AI service shows the set-up message and no retry button', async () => {
-  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_not_configured', 503)))
+  fetchMock.mockImplementation(() =>
+    Promise.resolve(errorResponse('ai_not_configured', 503, false)),
+  )
   const user = userEvent.setup()
   renderPanel()
 
@@ -328,6 +438,181 @@ test('an unconfigured AI service shows the set-up message and no retry button', 
   const alert = await screen.findByRole('alert')
   expect(alert).toHaveTextContent(NOT_CONFIGURED)
   expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+})
+
+test('a refused page address shows its sentence as plain text, with no link and no Try again', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('forbidden_origin', 403, false)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(
+    "The app server refused this page's address. Open the app at http://localhost:5173 or set ALLOWED_ORIGINS.",
+  )
+  expect(within(alert).queryByRole('link')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check my fit' })).toBeInTheDocument()
+})
+
+test('a failure that is not retryable offers no Try again and no resume control', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_blocked', 422, false)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent('The AI declined to process this resume and job')
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /edit resume/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /replace resume/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /re-check/i })).not.toBeInTheDocument()
+})
+
+test('a second failure with a different code replaces the sentence with the new one', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+  const first = await screen.findByRole('alert')
+  expect(first).toHaveTextContent(RATE_LIMITED)
+
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_overloaded', 503)))
+  await user.click(within(first).getByRole('button', { name: 'Try again' }))
+
+  await waitFor(() => {
+    expect(screen.getByRole('alert')).toHaveTextContent("Google's AI is busy right now.")
+  })
+  expect(screen.getByRole('alert')).not.toHaveTextContent('rate limiting')
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  expect(fetchMock).toHaveBeenCalledTimes(2)
+})
+
+test('a stopped app server (an empty 502) reads as one, with Try again', async () => {
+  fetchMock.mockImplementation(() =>
+    Promise.resolve(new Response('', { status: 502, headers: { 'content-type': 'text/plain' } })),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent("Can't reach the app server (is it running?)")
+  expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
+test('a request that times out reads like an AI timeout, with Try again', async () => {
+  fetchMock.mockImplementation(() =>
+    Promise.reject(new DOMException('The operation timed out.', 'TimeoutError')),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const timedOut = await screen.findByRole('alert')
+  expect(timedOut).toHaveTextContent('The request took too long. Try again.')
+  expect(within(timedOut).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_timeout', 504)))
+  await userEvent.setup().click(within(timedOut).getByRole('button', { name: 'Try again' }))
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'The request took too long. Try again.',
+  )
+})
+
+test.each([
+  ['an unknown code that is not retryable', 'brand_new_code', 500],
+  ['a validation_error', 'validation_error', 400],
+])('%s says to reload and offers no Try again', async (_name, code, status) => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse(code, status, false)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(
+    'Something went wrong on our side. Reload the page and check again.',
+  )
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+})
+
+test("this app's own request limit is never worded as Google's", async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('too_many_requests', 429)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(
+    'Too many requests in a short time. Wait a minute, then try again.',
+  )
+  expect(alert).not.toHaveTextContent("Google's AI")
+  expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
+test('the longest sentence is shown whole in a container that wraps it', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  const sentence = within(alert).getByText(RATE_LIMITED)
+  expect(sentence.className).not.toMatch(/truncate|line-clamp|overflow-hidden|whitespace-nowrap/)
+  for (let node: HTMLElement | null = sentence; node !== null; node = node.parentElement) {
+    expect(node.className).not.toMatch(/truncate|line-clamp|overflow-hidden|whitespace-nowrap/)
+    if (node === alert) break
+  }
+  expect(alert.firstElementChild?.nextElementSibling).toHaveClass('break-words')
+})
+
+test('after Try again, focus is on the header Check again when a result exists', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+  const alert = await screen.findByRole('alert')
+
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check again' })).toHaveFocus()
+})
+
+test('after Try again with no result yet, focus is on Check my fit and then on Check again', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+  const alert = await screen.findByRole('alert')
+
+  let finish: (response: Response) => void = () => undefined
+  fetchMock.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve
+      }),
+  )
+  await user.click(within(alert).getByRole('button', { name: 'Try again' }))
+
+  expect(screen.getByRole('button', { name: 'Check my fit' })).toHaveFocus()
+
+  finish(jsonResponse(fitResponse(FIVE_MET_ONE_PARTIAL)))
+  expect(await screen.findByRole('button', { name: 'Check again' })).toHaveFocus()
 })
 
 test('a failed Check again keeps the previous result visible below the notice', async () => {
@@ -350,7 +635,7 @@ test('a stored result is shown at once and sends no request', () => {
 
   expect(screen.getByText('83%')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
-  expect(screen.queryByRole('status')).toHaveTextContent('')
+  expect(liveRegion()).toHaveTextContent('')
   expect(fetchMock).not.toHaveBeenCalled()
 })
 
@@ -408,4 +693,281 @@ test('rating tones are success, caution and neutral, and nothing uses the danger
   expect(within(at(items, 1)).getByText('Partial').parentElement).toHaveClass('bg-amber-50')
   expect(within(at(items, 2)).getByText('Not evidenced').parentElement).toHaveClass('bg-gray-100')
   expect(container.innerHTML).not.toMatch(/red-/)
+})
+
+test('a stored result with learning plans shows the Gaps section after the Requirements list', () => {
+  seed(
+    fitResponse(
+      FIVE_MET_ONE_PARTIAL,
+      ['not_evidenced', 'met'],
+      {},
+      {
+        plans: [
+          {
+            requirementId: 'r6',
+            steps: ['Read the state management guide'],
+            whyItMatters: 'Because r6.',
+            effort: 'days',
+          },
+        ],
+        tailoring: null,
+      },
+    ),
+  )
+  renderPanel()
+
+  const requirements = screen.getByRole('heading', { level: 3, name: 'Requirements' })
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  expect(requirements.compareDocumentPosition(gaps) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('heading', { level: 4, name: 'Required gaps (1)' })).toBeInTheDocument()
+  expect(
+    screen.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (1)' }),
+  ).toBeInTheDocument()
+  expect(screen.getByText('Read the state management guide')).toBeInTheDocument()
+})
+
+const OLD_RESULT_SENTENCE =
+  'Learning plans and tailoring tips are new. Check again to add them to this result.'
+const NOTICE_BUTTON = 'Check again to add learning plans and tips'
+const R6_ADVICE: Advice = {
+  plans: [
+    {
+      requirementId: 'r6',
+      steps: ['Read the state management guide'],
+      whyItMatters: 'Because r6.',
+      effort: 'days',
+    },
+  ],
+  tailoring: null,
+}
+
+test('a result saved before learning plans existed offers Check again under the Gaps heading', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  const notice = screen
+    .getAllByRole('status')
+    .find((region) => region.textContent.includes(OLD_RESULT_SENTENCE))
+  if (notice === undefined) throw new Error('The old-result notice is missing')
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  const groups = screen.getByRole('heading', { level: 4, name: 'Required gaps (1)' })
+  expect(gaps.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(notice.compareDocumentPosition(groups) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  const button = within(notice).getByRole('button', { name: NOTICE_BUTTON })
+  expect(button).toHaveTextContent('Check again')
+  expect(button).not.toHaveAttribute('aria-disabled', 'true')
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('an old result shows its gaps with no plan area and no missing-plan line', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByText('partly evidenced in your resume')).toBeInTheDocument()
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.queryByText(/No learning plan was generated/)).not.toBeInTheDocument()
+})
+
+test('a result that has learning plans shows no old-result notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  renderPanel()
+
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: NOTICE_BUTTON })).not.toBeInTheDocument()
+})
+
+test('the notice button sends one request, adds the plans, keeps the score and removes the notice', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(screen.getByText('83%')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, init] = at(fetchMock.mock.calls, 0)
+  expect(url).toBe('/api/fit')
+  expect(JSON.parse(typeof init?.body === 'string' ? init.body : '')).toEqual({
+    jobId: JOB.id,
+    resumeText: RESUME.text,
+  })
+  expect(screen.getByText('83%')).toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: NOTICE_BUTTON })).not.toBeInTheDocument()
+})
+
+test('focus moves to the header Check again button when the notice button is used', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  let finish: (response: Response) => void = () => undefined
+  fetchMock.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  // While the check runs the notice is hidden, and focus has not fallen back to the page.
+  const header = screen.getByRole('button', { name: 'Check again' })
+  expect(header).toHaveFocus()
+  expect(header).toHaveAttribute('aria-disabled', 'true')
+
+  finish(jsonResponse(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE)))
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check again' })).toHaveFocus()
+})
+
+test('the header Check again button also adds the plans and focus stays on it', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+})
+
+test('a failed check from the notice keeps the old result and its notice below the error', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(GENERIC_ERROR)
+  expect(screen.getByText('83%')).toBeInTheDocument()
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: NOTICE_BUTTON })).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+test('the notice button is unavailable the same way as the header button, and sends nothing', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  const user = userEvent.setup()
+  renderPanel(RESUME, 'The AI service is not available right now.')
+
+  const button = screen.getByRole('button', { name: NOTICE_BUTTON })
+  await user.click(button)
+
+  expect(button).toHaveAttribute('aria-disabled', 'true')
+  expect(button).not.toHaveAttribute('disabled')
+  expect(button).toHaveAccessibleDescription('The AI service is not available right now.')
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('the first check still moves focus to Check again once the result appears', async () => {
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  expect(await screen.findByRole('button', { name: 'Check again' })).toHaveFocus()
+})
+
+test('the panel keeps one announcement region of its own and adds only the notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getAllByRole('status')).toHaveLength(2)
+  expect(liveRegion()).toHaveTextContent('')
+})
+
+const TAILORED_ADVICE: Advice = {
+  plans: R6_ADVICE.plans,
+  tailoring: {
+    emphasise: [{ quote: 'Quote for r1', advice: 'Say it first.' }],
+    keywords: ['Kubernetes'],
+  },
+}
+
+test('a stored result with advice shows the Tailoring section after the Gaps section', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  renderPanel()
+
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  const tailoring = screen.getByRole('heading', {
+    level: 3,
+    name: 'Tailoring your resume for this job',
+  })
+  expect(gaps.compareDocumentPosition(tailoring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByText('Say it first.')).toBeInTheDocument()
+  expect(screen.getByText('Kubernetes')).toBeInTheDocument()
+})
+
+test('a stored result with no advice shows no Tailoring heading', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByRole('heading', { level: 3, name: 'Gaps' })).toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})
+
+test('while a check runs the Tailoring section is not rendered', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(
+    screen.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+  ).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  await screen.findByRole('progressbar', { name: 'Checking your fit' })
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})
+
+test('a failed re-check keeps the previous tips and keywords below the error notice', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  const alert = await screen.findByRole('alert')
+  const tip = screen.getByText('Say it first.')
+  expect(alert.compareDocumentPosition(tip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('list', { name: 'Emphasise what you already have' })).toBeInTheDocument()
+  expect(screen.getByText('Kubernetes')).toBeInTheDocument()
+})
+
+test('an old result shows the old-result notice and no Tailoring section', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})
+
+test('advice with unusable tailoring shows the heading and the unavailable line, no old-result notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  renderPanel()
+
+  expect(
+    screen.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'Tailoring tips could not be generated for this check. Check again to try once more.',
+    ),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
 })

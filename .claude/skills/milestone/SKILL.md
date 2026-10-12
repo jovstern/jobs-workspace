@@ -1,94 +1,155 @@
 ---
 name: milestone
-description: Run one milestone end to end - questions, plan, build, test, review, demo, pull request.
+description: Run the next block of the current milestone - questions and plan, then build and review, then verify, demo and pull request.
 argument-hint: "[phase number]"
 disable-model-invocation: true
 ---
 
 # /milestone
 
-Runs one roadmap phase from questions to an open pull request. The user approves the plan
-and merges the PR; everything else is yours.
+A milestone (one roadmap phase) runs in **three blocks, each in a fresh session**:
 
-Phase to run: `$ARGUMENTS`. If empty, use the first phase in `.planning/ROADMAP.md` that is
-not complete.
+| Block | Does | Ends when |
+|---|---|---|
+| 1. Plan | questions, issue, plan | the user approves the plan |
+| 2. Build | build, code review | all gates are green |
+| 3. Ship | verify, demo, pull request | the PR is open and green |
 
-Work through the stages in order. Each stage has an exit condition; do not start the next
-one until it is met. If you are resuming, read `.planning/STATE.md` and the phase folder to
-find the first stage that is not finished, and continue from there.
+Run **one block per invocation**, then stop. Each block ends by telling the user exactly
+what to type for the next one (see "Model per block"). Never continue into the next block
+in the same session: carrying one block's context into the next is what made this workflow
+expensive. Everything a later block needs is on disk in `.planning/`.
 
-## Rules for the whole run
+## Model per block
+
+| Block | Session model | Why |
+|---|---|---|
+| 1. Plan | Opus | the questions and the plan summary are the main session's own work |
+| 2. Build | Sonnet | the main session only dispatches builders and waits |
+| 3. Ship | Opus | verification involves judgment |
+
+Subagents are unaffected: GSD picks their models itself (the planner stays on Opus).
+
+**Before starting a block, check the model you are running as.** If it is not the one in
+the table, do nothing else: tell the user to switch and run `/milestone` again, then stop.
+The switch for this session only is `/model`, pick the model, and press `s` ("this session
+only"); typing `/model sonnet` directly would also change the default for every project.
+
+End-of-block message:
+
+- after block 1: "Run `/clear`, then `/model` → Sonnet → `s`, then `/milestone`."
+- after block 2: "Run `/clear`, then `/model` → Opus → `s`, then `/milestone`."
+- after block 3: the report; the next milestone starts on Opus.
+
+Phase: `$ARGUMENTS`, or if empty the first phase in `.planning/ROADMAP.md` that is not
+complete.
+
+## Rules for every block
 
 - Never push to `main`, never merge a pull request, never use `--no-verify`.
 - Never weaken a gate to get past it (see `.claude/skills/quality-gates/SKILL.md`).
-- Stop and report when: a gate stays red after two fix attempts, the plan turns out to be
+- Stop and report when a gate stays red after two fix attempts, the plan turns out to be
   wrong, or the work needs something outside the phase's scope.
+- Keep context small: read a planning file only when a step needs it, and prefer the
+  section you need over the whole file. Do not re-read `.claude/CLAUDE.md`; it is already
+  loaded.
 
-## 0. Start clean
+## Which block to run
 
-1. Working tree must be clean. If not, stop and show what is uncommitted.
-2. If the previous phase's PR is still open, stop and tell the user to merge it first.
-3. `git switch main && git pull --ff-only`
-4. Get the phase's branch name and create it **now**, before any planning commits:
+Find the phase folder under `.planning/phases/` and its `MILESTONE.md` (this skill's own
+record: issue number, research decision, plan approval, PR). Then:
+
+1. A PR for this phase is open → nothing to run. Tell the user it is waiting for their
+   merge and stop.
+2. No plans, or `MILESTONE.md` has no `plan_approved` line → **Block 1**. If plans already
+   exist but approval was never recorded, run only steps 6 and 7 of block 1 (issue, then
+   summary and approval).
+3. Plans approved, and either a plan has no summary or there is no finished code review →
+   **Block 2**.
+4. Build and review done, no PR → **Block 3**.
+
+Before any block: the working tree must be clean (otherwise stop and show what is
+uncommitted), and you must be on the phase branch. GSD's own runtime files left by an
+interrupted run (`.planning/state.json`, `.planning/*.lock`) do not count as dirty: leave
+them for GSD to resume from. If the branch does not exist yet:
+
+```bash
+git switch main && git pull --ff-only
+node .claude/gsd-core/bin/gsd-tools.cjs query init.execute-phase <N> --pick branch_name
+git switch -c <branch_name>
+```
+
+Create it before any planning commit: planning files committed on local `main` would be
+left out of the PR.
+
+## Block 1 — Plan
+
+1. **What changed.** Ask the user what changed since the last milestone: new ideas, things
+   they disliked in what was built, decisions to revisit. If an answer changes the roadmap,
+   update it with `/gsd-phase --edit` first.
+2. **Questions.** `/gsd-discuss-phase <N>`.
+3. **Size check.** If the phase clearly needs more than about five plans, propose a split
+   to the user and, if they agree, move the later part into a new phase with
+   `/gsd-phase --insert`. Large phases are the main cause of oversized planner runs.
+4. **Research decision.** Phase research is needed only when the phase introduces a
+   library, external API or technique the codebase does not already use. Tell the user
+   which you chose and why in one sentence, and record it in `MILESTONE.md`. They can
+   overrule it.
+5. **Plan.** `/gsd-plan-phase <N>`, with `--skip-research` when research is not needed.
+6. **Issue.** If `MILESTONE.md` has no issue number, create one from the phase's goal and
+   success criteria in `ROADMAP.md` and record the number:
 
    ```bash
-   node .claude/gsd-core/bin/gsd-tools.cjs query init.execute-phase <N> --pick branch_name
-   git switch -c <branch_name>    # or `git switch <branch_name>` if it exists
+   gh issue create --title "Phase <N>: <name>" --body-file <file>
    ```
 
-   Planning files committed on local `main` would be left out of the PR, so everything from
-   here on happens on this branch.
+7. **Summary and approval.** Give the user a short summary: what will be built, the plans,
+   the tests that will prove it, the flow the demo will show, and anything you are unsure
+   about. When they explicitly approve, add `plan_approved: <date>` to `MILESTONE.md` and
+   commit it. If they ask for changes, replan and ask again. Write no code in this block.
 
-## 1. Questions — `/gsd-discuss-phase <N>`
+## Block 2 — Build
 
-Before the phase's own questions, ask the user what changed since the last milestone: new
-ideas, things they disliked in what was built, decisions to revisit. If an answer changes
-the roadmap, update it with `/gsd-phase --edit` before going on.
+1. `/gsd-execute-phase <N>`
+2. `npm run check` and `npm run e2e` must both pass.
+3. `/gsd-code-review <N> --fix`, then run both gates again.
+4. For each item the phase deferred (`deferred-items.md`, review findings pushed to a later
+   phase) that has no issue yet, create one and note its number next to the item:
 
-**Exit:** the phase's `CONTEXT.md` exists and the user has no open questions.
+   ```bash
+   gh label create deferred --color BFD4F2 --description "Deferred from a phase" 2>/dev/null || true
+   gh issue create --label deferred --title "<item>" --body "<what, why deferred, from phase N>"
+   ```
 
-## 2. Plan — `/gsd-plan-phase <N>`
+**Exit:** every plan has a summary, no Critical or Warning review findings remain, gates
+pass.
 
-When planning finishes, give the user a short summary: what will be built, the tasks, the
-tests that will prove it, the flow the demo will show, and anything you are unsure about.
+## Block 3 — Ship
 
-**Exit:** the user explicitly approves the plan. Do not write code before that. If they ask
-for changes, replan and ask again.
+1. `/gsd-verify-work <N>`: start the app and exercise the acceptance criteria in a real
+   browser. Items that need the user's judgment are asked here. Verification status must
+   be `passed`.
+2. The `pr-demo` skill: `phase-<NN>/demo.gif` is on the `pr-media` branch and you have
+   looked at it.
+3. `/gsd-ship <N>`
+4. Link the issue: append `Closes #<issue>` to the PR body.
 
-## 3. Build — `/gsd-execute-phase <N>`
+   ```bash
+   gh pr view <number> --json body -q .body > <file>
+   printf '\n\nCloses #<issue>\n' >> <file>
+   gh pr edit <number> --body-file <file>
+   ```
 
-**Exit:** every plan has a summary, and `npm run check` and `npm run e2e` both pass.
+5. Confirm the PR body has the Demo image (fix as described in `pr-demo` if not), then
+   `gh pr checks <number> --watch`. If a check fails, fix it on the branch and push.
+6. Record the PR number in `MILESTONE.md` and report: the PR link, what was built in two or
+   three sentences, what the demo shows, anything deferred (with issue numbers), and that
+   the PR is waiting for their merge.
 
-## 4. Review — `/gsd-code-review <N> --fix`
+If this was the last phase of the roadmap, mention that `/gsd-complete-milestone` tags the
+release once the PR is merged.
 
-Re-run both gates after the fixes.
+## Checking the cost
 
-**Exit:** no Critical or Warning findings remain, gates pass.
-
-## 5. Verify — `/gsd-verify-work <N>`
-
-Start the app and exercise the phase's acceptance criteria in a real browser. Items that
-need the user's judgment are asked here.
-
-**Exit:** verification status is `passed`.
-
-## 6. Demo — the `pr-demo` skill
-
-**Exit:** `phase-<NN>/demo.gif` is on the `pr-media` branch and you have looked at it.
-
-## 7. Ship — `/gsd-ship <N>`
-
-Then:
-
-1. Confirm the PR body has the Demo image. If not, fix it as described in `pr-demo`.
-2. `gh pr checks <number> --watch`. If a check fails, fix it on the branch and push.
-
-**Exit:** the PR is open and every check is green.
-
-## 8. Report
-
-Give the user: the PR link, what was built in two or three sentences, what the demo shows,
-anything deferred or worth a look, and that the PR is waiting for their merge.
-
-If this was the last phase of the roadmap, say so and mention that `/gsd-complete-milestone`
-tags the release once the PR is merged.
+`python3 .claude/skills/milestone/usage-report.py --since <YYYY-MM-DD>` shows token use by
+agent and by context size for this project. Run it when the user asks what a block cost.

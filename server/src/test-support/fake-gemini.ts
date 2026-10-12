@@ -15,21 +15,43 @@ export type Scenario =
   | 'ok'
   | 'http_429'
   | 'http_503'
+  | 'http_403'
+  | 'http_402'
+  | 'http_400_billing'
+  | 'http_400_key'
   | 'blocked'
   | 'truncated'
   | 'garbage'
+  | 'finish_safety'
+  | 'finish_unexpected'
+  | 'empty'
+  | 'no_candidate'
+  | 'empty_ratings'
   | 'slow'
   | 'hallucinated_quote'
+  | 'advice_malformed'
+  | 'advice_partial'
 
-const SCENARIOS: readonly Scenario[] = [
+export const SCENARIOS: readonly Scenario[] = [
   'ok',
   'http_429',
   'http_503',
+  'http_403',
+  'http_402',
+  'http_400_billing',
+  'http_400_key',
   'blocked',
   'truncated',
   'garbage',
+  'finish_safety',
+  'finish_unexpected',
+  'empty',
+  'no_candidate',
+  'empty_ratings',
   'slow',
   'hallucinated_quote',
+  'advice_malformed',
+  'advice_partial',
 ]
 
 const SLOW_DELAY_MS = 3000
@@ -242,6 +264,153 @@ function rateFromPrompt(prompt: PromptParts, hallucinate: boolean): FakeRating[]
   })
 }
 
+interface FakePlan {
+  requirementId: string
+  steps: string[]
+  whyItMatters: string
+  effort: 'days' | 'weeks' | 'months'
+}
+
+interface FakeAdvice {
+  plans: FakePlan[]
+  tailoring: { emphasise: { quote: string; advice: string }[]; keywords: string[] }
+}
+
+const MAX_FAKE_TIPS = 2
+const MAX_FAKE_KEYWORDS = 8
+
+// An ordinary, clean plan for one gap. The texts name the skill and nothing else: no links, no
+// provider names, no numbers about the fit.
+function planFor(rated: FakeRating, skill: Skill): FakePlan {
+  const partial = rated.rating === 'partial'
+  const steps = partial
+    ? [`Read the official guide to ${skill}.`, `Build a small example that uses ${skill}.`]
+    : [
+        `Read the official guide to ${skill}.`,
+        `Follow a short course on ${skill}.`,
+        `Build a small example that uses ${skill}.`,
+      ]
+  return {
+    requirementId: rated.requirementId,
+    steps,
+    whyItMatters: `The role asks for ${skill}, and the resume does not yet show it.`,
+    effort: partial ? 'days' : 'weeks',
+  }
+}
+
+const TIP_ADVICE = 'Move this line higher, where a reader will see it first.'
+
+// One learning plan for every requirement that was not rated met, and a little tailoring built from
+// the lines that were rated. Like the ratings it is rule-based, so tests can predict it.
+function adviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]): FakeAdvice {
+  const job = getJob(prompt.jobId)
+  const skillOf = (requirementId: string) =>
+    job?.requirements.find((requirement) => requirement.id === requirementId)?.skill
+
+  const plans: FakePlan[] = ratings.flatMap((rated): FakePlan[] => {
+    if (rated.rating === 'met') return []
+    const skill = skillOf(rated.requirementId)
+    return skill === undefined ? [] : [planFor(rated, skill)]
+  })
+
+  const quotes = [...new Set([...quotable(ratings, 'met'), ...quotable(ratings, 'partial')])].slice(
+    0,
+    MAX_FAKE_TIPS,
+  )
+  const keywords = ratings
+    .flatMap((rated) => (rated.rating === 'met' ? [] : [skillOf(rated.requirementId)]))
+    .flatMap((skill) => (skill === undefined ? [] : [skill]))
+    .slice(0, MAX_FAKE_KEYWORDS)
+
+  return {
+    plans,
+    tailoring: {
+      emphasise: quotes.map((quote) => ({ quote, advice: TIP_ADVICE })),
+      keywords,
+    },
+  }
+}
+
+function quotable(ratings: readonly FakeRating[], rating: FakeRating['rating']): string[] {
+  return ratings.flatMap((rated) =>
+    rated.rating === rating && rated.quote !== null && rated.quote !== HALLUCINATED_QUOTE
+      ? [rated.quote]
+      : [],
+  )
+}
+
+// The ratings of "ok" with deliberately defective advice, so a test can prove that bad advice is
+// dropped item by item and never touches a rating. Built from the ratings, so it fits any job.
+function partialAdviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]): FakeAdvice {
+  const job = getJob(prompt.jobId)
+  const skillOf = (requirementId: string) =>
+    job?.requirements.find((requirement) => requirement.id === requirementId)?.skill
+  const gaps = ratings.flatMap((rated) => {
+    const skill = skillOf(rated.requirementId)
+    return rated.rating === 'met' || skill === undefined ? [] : [{ rated, skill }]
+  })
+  const met = ratings.flatMap((rated) => {
+    const skill = skillOf(rated.requirementId)
+    return rated.rating === 'met' && skill !== undefined ? [{ rated, skill }] : []
+  })
+
+  const plans: FakePlan[] = []
+  const [first, second, ...rest] = gaps
+  if (first !== undefined) {
+    const clean = planFor(first.rated, first.skill)
+    plans.push({
+      ...clean,
+      // Six steps, the first with a link: the link step goes, the next four are kept.
+      steps: [
+        'See https://example.com/course for an introduction',
+        'Read the official guide, step one.',
+        'Read the official guide, step two.',
+        'Read the official guide, step three.',
+        'Read the official guide, step four.',
+        'Read the official guide, step five.',
+      ],
+    })
+    // A second plan for the same requirement: the first one that survives wins.
+    plans.push({ ...clean, whyItMatters: 'A second plan for the same requirement.' })
+  }
+  if (second !== undefined) {
+    plans.push({
+      ...planFor(second.rated, second.skill),
+      whyItMatters: 'Details are at www.example.com for anyone who wants them.',
+    })
+  }
+  const metFirst = met[0]
+  if (metFirst !== undefined) plans.push(planFor(metFirst.rated, metFirst.skill))
+  plans.push({
+    requirementId: 'no-such-requirement',
+    steps: ['Read the official guide.'],
+    whyItMatters: 'This requirement is not in the posting.',
+    effort: 'days',
+  })
+  for (const { rated, skill } of rest) plans.push(planFor(rated, skill))
+
+  const quotes = [...new Set([...quotable(ratings, 'met'), ...quotable(ratings, 'partial')])]
+  const [realQuote, otherQuote] = quotes
+  const emphasise: FakeAdvice['tailoring']['emphasise'] = []
+  if (realQuote !== undefined) {
+    emphasise.push({ quote: realQuote, advice: TIP_ADVICE })
+    emphasise.push({ quote: HALLUCINATED_QUOTE, advice: TIP_ADVICE })
+    emphasise.push({ quote: realQuote, advice: TIP_ADVICE })
+    emphasise.push({
+      quote: otherQuote ?? realQuote,
+      advice: 'Read more at https://example.com/tips',
+    })
+  }
+
+  const keywords: string[] = []
+  if (first !== undefined) keywords.push(first.skill)
+  if (metFirst !== undefined) keywords.push(metFirst.skill)
+  keywords.push('Zyxwvut', 'https://example.com')
+  if (first !== undefined) keywords.push(first.skill.toLowerCase())
+
+  return { plans, tailoring: { emphasise, keywords } }
+}
+
 function textResponse(text: string, finishReason: string): unknown {
   return {
     candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason }],
@@ -294,9 +463,34 @@ function parseJson(text: string): unknown {
   }
 }
 
+type PromptScenario = 'ok' | 'hallucinated_quote' | 'advice_malformed' | 'advice_partial'
+
+// The rule-based answer to a fit prompt. The malformed and partial scenarios keep the ratings of
+// "ok" and break only the advice.
+function answerFromPrompt(response: ServerResponse, body: unknown, scenario: PromptScenario): void {
+  const prompt = parsePrompt(body)
+  if (prompt === null) {
+    sendJson(response, 400, {
+      error: { code: 400, message: 'Unrecognised prompt.', status: 'INVALID_ARGUMENT' },
+    })
+    return
+  }
+  const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
+  const answer =
+    scenario === 'advice_malformed'
+      ? { ratings, plans: 'not a list of plans', tailoring: ['not an object'] }
+      : scenario === 'advice_partial'
+        ? { ratings, ...partialAdviceFromRatings(prompt, ratings) }
+        : { ratings, ...adviceFromRatings(prompt, ratings) }
+  sendJson(response, 200, textResponse(JSON.stringify(answer), 'STOP'))
+}
+
 const GENERATE_PATH = /^\/v1beta\/models\/[^/:]+:generateContent$/
 
-export async function startFakeGemini(options: { port?: number } = {}): Promise<FakeGemini> {
+export async function startFakeGemini(
+  options: { port?: number; slowDelayMs?: number } = {},
+): Promise<FakeGemini> {
+  const slowDelayMs = options.slowDelayMs ?? SLOW_DELAY_MS
   let scenario: Scenario = 'ok'
   let count = 0
   let last: RecordedRequest | null = null
@@ -317,6 +511,50 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
           error: { code: 503, message: 'The model is overloaded.', status: 'UNAVAILABLE' },
         })
         return
+      // Each carries Google's own wording, so tests can prove that wording never reaches a response.
+      case 'http_403':
+        sendJson(response, 403, {
+          error: {
+            code: 403,
+            message: 'Permission denied for this key.',
+            status: 'PERMISSION_DENIED',
+          },
+        })
+        return
+      case 'http_402':
+        sendJson(response, 402, {
+          error: {
+            code: 402,
+            message: 'Prepaid credits are depleted.',
+            status: 'PAYMENT_REQUIRED',
+          },
+        })
+        return
+      case 'http_400_billing':
+        sendJson(response, 400, {
+          error: {
+            code: 400,
+            message: 'Billing is not enabled for this project.',
+            status: 'FAILED_PRECONDITION',
+          },
+        })
+        return
+      case 'http_400_key':
+        sendJson(response, 400, {
+          error: {
+            code: 400,
+            message: 'API key not valid. Please pass a valid API key.',
+            status: 'INVALID_ARGUMENT',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'API_KEY_INVALID',
+                domain: 'googleapis.com',
+              },
+            ],
+          },
+        })
+        return
       case 'blocked':
         sendJson(response, 200, { promptFeedback: { blockReason: 'PROHIBITED_CONTENT' } })
         return
@@ -330,28 +568,37 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
       case 'garbage':
         sendJson(response, 200, textResponse('this is not json {', 'STOP'))
         return
+      case 'finish_safety':
+        sendJson(response, 200, { candidates: [{ finishReason: 'SAFETY' }] })
+        return
+      case 'finish_unexpected':
+        sendJson(response, 200, { candidates: [{ finishReason: 'MALFORMED_FUNCTION_CALL' }] })
+        return
+      case 'empty':
+        sendJson(response, 200, textResponse('', 'STOP'))
+        return
+      case 'no_candidate':
+        sendJson(response, 200, { candidates: [] })
+        return
+      case 'empty_ratings':
+        sendJson(response, 200, textResponse(JSON.stringify({ ratings: [] }), 'STOP'))
+        return
       case 'slow': {
+        // Ends well after the delay, exactly as "ok" does, so a slow check can be shown succeeding.
         const timer = setTimeout(() => {
-          sendJson(response, 200, textResponse('{"ratings":[]}', 'STOP'))
-        }, SLOW_DELAY_MS)
+          answerFromPrompt(response, body, 'ok')
+        }, slowDelayMs)
         response.on('close', () => {
           clearTimeout(timer)
         })
         return
       }
       case 'ok':
-      case 'hallucinated_quote': {
-        const prompt = parsePrompt(body)
-        if (prompt === null) {
-          sendJson(response, 400, {
-            error: { code: 400, message: 'Unrecognised prompt.', status: 'INVALID_ARGUMENT' },
-          })
-          return
-        }
-        const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
-        sendJson(response, 200, textResponse(JSON.stringify({ ratings }), 'STOP'))
+      case 'hallucinated_quote':
+      case 'advice_malformed':
+      case 'advice_partial':
+        answerFromPrompt(response, body, scenario)
         return
-      }
     }
   }
 

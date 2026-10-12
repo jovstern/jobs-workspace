@@ -1,7 +1,7 @@
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { apiErrorSchema, fitResponseSchema } from '@jobs-workspace/shared'
+import { apiErrorSchema, ERROR_MESSAGES, fitResponseSchema } from '@jobs-workspace/shared'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { z } from 'zod'
 
@@ -9,7 +9,7 @@ import { createApp } from '../app'
 import { createGeminiClient } from '../ai/client'
 import type { AiClient } from '../ai/client'
 import { getJob } from '../jobs/seed'
-import { startFakeGemini } from '../test-support/fake-gemini'
+import { SCENARIOS, startFakeGemini } from '../test-support/fake-gemini'
 import type { FakeGemini } from '../test-support/fake-gemini'
 
 const API_KEY = 'ci-fake-key'
@@ -97,7 +97,32 @@ test('returns one rating per requirement, in posting order, with verbatim quotes
     expect(rating.quote).not.toBeNull()
     expect(RESUME_A).toContain(rating.quote)
   }
-  expect(body.advice).toBeNull()
+  const gaps = body.ratings.filter((rating) => rating.rating !== 'met')
+  expect(gaps.length).toBeGreaterThan(0)
+  expect(body.advice?.plans.map((entry) => entry.requirementId)).toEqual(
+    gaps.map((rating) => rating.requirementId),
+  )
+  for (const entry of body.advice?.plans ?? []) {
+    expect([2, 3]).toContain(entry.steps.length)
+  }
+  expect(body.advice?.tailoring === null || typeof body.advice?.tailoring === 'object').toBe(true)
+  expect(fake.requestCount()).toBe(1)
+})
+
+test('malformed advice from the model costs nothing: the ratings stay, the advice is empty', async () => {
+  const baseline = fitResponseSchema.parse(
+    JSON.parse((await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })).text),
+  )
+  fake.reset()
+  fake.setScenario('advice_malformed')
+
+  const { status, text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+
+  expect(status).toBe(200)
+  const body = fitResponseSchema.parse(JSON.parse(text))
+  expect(body.ratings).toHaveLength(8)
+  expect(body.ratings).toEqual(baseline.ratings)
+  expect(body.advice).toEqual({ plans: [], tailoring: null })
   expect(fake.requestCount()).toBe(1)
 })
 
@@ -185,24 +210,158 @@ describe('requests that must never reach the model', () => {
   })
 })
 
+// The one table of every failing stand-in scenario: the code, status and retry flag it must leave
+// the route with.
+const FAILURE_TABLE = [
+  ['http_429', 429, 'ai_rate_limited', true],
+  ['http_503', 502, 'ai_overloaded', true],
+  ['http_403', 502, 'ai_auth_failed', false],
+  ['http_402', 502, 'ai_billing', false],
+  ['http_400_billing', 502, 'ai_billing', false],
+  ['http_400_key', 502, 'ai_auth_failed', false],
+  ['blocked', 422, 'ai_blocked', false],
+  ['finish_safety', 422, 'ai_blocked', false],
+  ['truncated', 502, 'ai_truncated', true],
+  ['garbage', 502, 'ai_invalid_output', true],
+  ['empty', 502, 'ai_invalid_output', true],
+  ['no_candidate', 502, 'ai_invalid_output', true],
+  ['empty_ratings', 502, 'ai_invalid_output', true],
+  ['finish_unexpected', 502, 'ai_failed', true],
+] as const
+
+const NON_FAILING_SCENARIOS = [
+  'ok',
+  'slow',
+  'hallucinated_quote',
+  'advice_malformed',
+  'advice_partial',
+] as const
+
+// Words the provider, the prompt or the resume carry, and that must never reach an error body.
+const FORBIDDEN_IN_BODIES = [
+  'Quota exceeded',
+  'The model is overloaded',
+  'PROHIBITED_CONTENT',
+  'Permission denied for this key',
+  'API key not valid',
+  'Billing is not enabled',
+  'Prepaid credits',
+  'TASK: fit-ratings',
+  'Built React single page applications',
+  'logistics start-up',
+]
+
 describe('model and upstream failures', () => {
-  test.each(['http_503', 'http_429', 'blocked', 'truncated', 'garbage'] as const)(
-    '%s answers 502 ai_failed after exactly one upstream request',
-    async (scenario) => {
+  test('every stand-in scenario is either in the failure table or known to succeed', () => {
+    const listed: string[] = [...FAILURE_TABLE.map(([name]) => name), ...NON_FAILING_SCENARIOS]
+    expect([...SCENARIOS].sort()).toEqual([...listed].sort())
+  })
+
+  test.each(FAILURE_TABLE)(
+    '%s answers %i %s after exactly one upstream request',
+    async (scenario, expectedStatus, expectedCode, expectedRetryable) => {
       fake.setScenario(scenario)
 
       const { status, text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
 
-      expect(status).toBe(502)
+      expect(status).toBe(expectedStatus)
       const body = apiErrorSchema.parse(JSON.parse(text))
-      expect(body.error.code).toBe('ai_failed')
-      expect(body.error.retryable).toBe(true)
+      expect(body.error.code).toBe(expectedCode)
+      expect(body.error.retryable).toBe(expectedRetryable)
+      expect(body.error.message).toBe(ERROR_MESSAGES[expectedCode])
       expect(fake.requestCount()).toBe(1)
     },
   )
+
+  test("a key Google is rate limiting gets Google's own sentence", async () => {
+    fake.setScenario('http_429')
+
+    const { text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+
+    expect(JSON.parse(text)).toMatchObject({
+      error: {
+        code: 'ai_rate_limited',
+        retryable: true,
+        message:
+          "Google's AI is rate limiting this key. Wait a while, then try again. If it keeps happening, a daily quota may be used up: check your usage in Google AI Studio.",
+      },
+    })
+  })
+
+  test("no error body holds the provider's own wording, the prompt or the resume", async () => {
+    for (const [scenario] of FAILURE_TABLE) {
+      fake.reset()
+      fake.setScenario(scenario)
+      const { text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+      for (const forbidden of FORBIDDEN_IN_BODIES) {
+        expect(text, `${scenario} body`).not.toContain(forbidden)
+      }
+    }
+  })
+
+  test("Google's rate limit is never this app's own limit: no Retry-After, and a different sentence", async () => {
+    fake.setScenario('http_429')
+
+    const response = await fetch(`${baseUrl}/api/fit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobId: JOB_ID, resumeText: RESUME_A }),
+    })
+    const body = apiErrorSchema.parse(await response.json())
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBeNull()
+    expect(body.error.code).toBe('ai_rate_limited')
+    expect(body.error.message).toBe(ERROR_MESSAGES.ai_rate_limited)
+    expect(body.error.message).not.toBe(ERROR_MESSAGES.too_many_requests)
+  })
+
+  test('a stand-in that cannot be reached answers 502 ai_network, retryable, and logs only a category', async () => {
+    const gone = await startFakeGemini()
+    const goneUrl = gone.url
+    await gone.close()
+    const lines: string[] = []
+    const unreachable = await listen(
+      createApp({
+        ai: createGeminiClient({ apiKey: API_KEY, baseUrl: goneUrl }),
+        log: (line) => lines.push(line),
+      }),
+    )
+    try {
+      const { status, text } = await postFit(unreachable.url, {
+        jobId: JOB_ID,
+        resumeText: RESUME_A,
+      })
+
+      expect(status).toBe(502)
+      const body = apiErrorSchema.parse(JSON.parse(text))
+      expect(body.error).toEqual({
+        code: 'ai_network',
+        retryable: true,
+        message: ERROR_MESSAGES.ai_network,
+      })
+      expect(lines).toContain('fit failed status=none category=network')
+      expect(text).not.toContain(goneUrl)
+    } finally {
+      unreachable.server.close()
+    }
+  })
+
+  test('a 400 the stand-in does not recognise still leaves as ai_failed', async () => {
+    // The unrecognised-prompt 400 is what the stand-in answers to a request that is not a fit prompt.
+    await expect(
+      ai.generateJson({
+        task: 'fit',
+        system: 'not a fit prompt',
+        userText: 'unused',
+        schema: z.object({}),
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({ code: 'ai_failed' })
+  })
 })
 
-test('a missed deadline rejects with ai_failed', async () => {
+test('a missed deadline rejects with ai_timeout', async () => {
   fake.setScenario('slow')
 
   await expect(
@@ -214,7 +373,25 @@ test('a missed deadline rejects with ai_failed', async () => {
       signal: new AbortController().signal,
       overrides: { deadlineMs: 200 },
     }),
-  ).rejects.toMatchObject({ code: 'ai_failed' })
+  ).rejects.toMatchObject({ code: 'ai_timeout' })
+})
+
+test('a slow answer that ends in time still succeeds with every rating', async () => {
+  const slow = await startFakeGemini({ slowDelayMs: 300 })
+  const slowAi = createGeminiClient({ apiKey: API_KEY, baseUrl: slow.url })
+  const slowApp = await listen(createApp({ ai: slowAi }))
+  try {
+    slow.setScenario('slow')
+
+    const { status, text } = await postFit(slowApp.url, { jobId: JOB_ID, resumeText: RESUME_A })
+
+    expect(status).toBe(200)
+    expect(fitResponseSchema.parse(JSON.parse(text)).ratings).toHaveLength(8)
+    expect(slow.requestCount()).toBe(1)
+  } finally {
+    slowApp.server.close()
+    await slow.close()
+  }
 })
 
 test('two simultaneous requests with different resumes get quotes only from their own resume', async () => {
@@ -304,7 +481,8 @@ describe('contact details never reach the model', () => {
 
 test('no response body contains the AI key', async () => {
   const bodies: string[] = []
-  for (const scenario of ['ok', 'http_503', 'blocked', 'garbage'] as const) {
+  for (const scenario of ['ok', ...FAILURE_TABLE.map(([name]) => name)] as const) {
+    fake.reset()
     fake.setScenario(scenario)
     bodies.push((await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })).text)
   }

@@ -150,7 +150,11 @@ describe('guards around the paid route', () => {
         const response = await postFit(limited.url)
         statuses.push(response.status)
         if (response.status === 429) {
-          expect(apiErrorSchema.parse(await response.json()).error.code).toBe('too_many_requests')
+          const { error } = apiErrorSchema.parse(await response.json())
+          expect(error.code).toBe('too_many_requests')
+          expect(error.message).toBe(
+            'Too many requests in a short time. Wait a minute, then try again.',
+          )
           expect(response.headers.get('retry-after')).toMatch(/^\d+$/)
         } else {
           await response.text()
@@ -159,6 +163,29 @@ describe('guards around the paid route', () => {
 
       expect(statuses).toEqual([200, 200, 429])
       expect(calls()).toBe(2)
+    } finally {
+      limited.server.close()
+    }
+  })
+
+  test('with rateLimit max 1 the second fit request answers 429 too_many_requests before any model call', async () => {
+    const { ai, calls } = countingAi()
+    const limited = await listen(createApp({ ai, rateLimit: { windowMs: 60_000, max: 1 } }))
+    try {
+      const first = await postFit(limited.url)
+      await first.text()
+      const second = await postFit(limited.url)
+
+      expect(first.status).toBe(200)
+      expect(second.status).toBe(429)
+      const { error } = apiErrorSchema.parse(await second.json())
+      expect(error.code).toBe('too_many_requests')
+      expect(error.retryable).toBe(true)
+      expect(error.message).toBe(
+        'Too many requests in a short time. Wait a minute, then try again.',
+      )
+      expect(second.headers.get('retry-after')).toMatch(/^\d+$/)
+      expect(calls()).toBe(1)
     } finally {
       limited.server.close()
     }
@@ -188,7 +215,12 @@ describe('guards around the paid route', () => {
       const response = await postFit(guarded.url, { origin: 'https://evil.example' })
 
       expect(response.status).toBe(403)
-      expect(apiErrorSchema.parse(await response.json()).error.code).toBe('forbidden_origin')
+      const { error } = apiErrorSchema.parse(await response.json())
+      expect(error.code).toBe('forbidden_origin')
+      expect(error.retryable).toBe(false)
+      expect(error.message).toBe(
+        "The app server refused this page's address. Open the app at http://localhost:5173 or set ALLOWED_ORIGINS.",
+      )
       expect(calls()).toBe(0)
     } finally {
       guarded.server.close()

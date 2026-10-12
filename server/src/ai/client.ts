@@ -6,6 +6,7 @@ import type { AiTask, ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
 import { diagnoseError } from './diagnose'
 import type { AiFailureDiagnostic, FailureCategory } from './diagnose'
+import { failureToErrorCode } from './failure-code'
 import { toGeminiSchema } from './schema'
 
 export interface AiUsage {
@@ -21,7 +22,11 @@ export interface GenerateJsonRequest<T> {
   task: AiTask
   system: string
   userText: string
+  // What the answer is parsed with.
   schema: z.ZodType<T>
+  // What the provider is shown. Defaults to `schema`; set it when the parse schema is more lenient
+  // than the one the provider should be asked to follow.
+  wireSchema?: z.ZodType
   signal: AbortSignal
   overrides?: {
     thinking?: ThinkingLevelName
@@ -51,6 +56,24 @@ const THINKING_LEVELS: Record<ThinkingLevelName, ThinkingLevel> = {
   HIGH: ThinkingLevel.HIGH,
 }
 
+// Finish reasons that mean the answer was declined, not merely cut short. Built from the SDK's own
+// members so a renamed member fails the typecheck instead of silently falling through.
+const DECLINED_FINISH_REASONS: ReadonlySet<FinishReason> = new Set([
+  FinishReason.SAFETY,
+  FinishReason.PROHIBITED_CONTENT,
+  FinishReason.BLOCKLIST,
+  FinishReason.SPII,
+  FinishReason.RECITATION,
+  FinishReason.LANGUAGE,
+  FinishReason.OTHER,
+])
+
+// Finish reasons that mean the answer stopped before it was done.
+const CUT_OFF_FINISH_REASONS: ReadonlySet<FinishReason> = new Set([
+  FinishReason.MAX_TOKENS,
+  FinishReason.CONTINUATION,
+])
+
 export function createGeminiClient(options: GeminiClientOptions): AiClient {
   const genai = new GoogleGenAI({
     apiKey: options.apiKey,
@@ -61,12 +84,19 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
     const model = MODELS[request.task]
     const deadlineMs = request.overrides?.deadlineMs ?? model.deadlineMs
     const startedAt = Date.now()
+    // Kept, not inlined: a missed deadline and a browser that went away both arrive as the same
+    // abort error, so only this signal's own state can tell them apart.
+    const deadline = AbortSignal.timeout(deadlineMs)
 
     // Reports why a call failed, as a status and a category only, and ends it with the one typed
-    // error the route layer knows. Nothing about the failure itself is kept.
+    // error whose code names the cause. Nothing about the failure itself is kept.
+    function fail(diagnostic: AiFailureDiagnostic): never {
+      request.onFailure?.(diagnostic)
+      throw new AppError(failureToErrorCode(diagnostic))
+    }
+
     function reject(category: FailureCategory): never {
-      request.onFailure?.({ httpStatus: null, category, errorClass: null })
-      throw new AppError('ai_failed')
+      fail({ httpStatus: null, category, errorClass: null })
     }
 
     try {
@@ -78,12 +108,12 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
         config: {
           systemInstruction: request.system,
           responseMimeType: 'application/json',
-          responseJsonSchema: toGeminiSchema(request.schema),
+          responseJsonSchema: toGeminiSchema(request.wireSchema ?? request.schema),
           thinkingConfig: {
             thinkingLevel: THINKING_LEVELS[request.overrides?.thinking ?? model.thinking],
           },
           maxOutputTokens: request.overrides?.maxOutputTokens ?? model.maxOutputTokens,
-          abortSignal: AbortSignal.any([request.signal, AbortSignal.timeout(deadlineMs)]),
+          abortSignal: AbortSignal.any([request.signal, deadline]),
         },
       })
 
@@ -102,7 +132,11 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
 
       // A blocked, truncated or empty answer arrives as HTTP 200, so success is never assumed.
       if (response.promptFeedback?.blockReason !== undefined) reject('blocked')
-      if (finishReason !== FinishReason.STOP) reject('unfinished')
+      if (finishReason === undefined) reject('empty_text')
+      if (finishReason !== FinishReason.STOP) {
+        if (CUT_OFF_FINISH_REASONS.has(finishReason)) reject('unfinished')
+        reject(DECLINED_FINISH_REASONS.has(finishReason) ? 'blocked' : 'unknown')
+      }
       const text = response.text
       if (text === undefined || text.trim() === '') reject('empty_text')
 
@@ -113,8 +147,10 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
       // ApiError, aborts (client gone or deadline), network failures and unparseable JSON all
       // end here. Nothing about the failure is kept: it could echo prompt or model text.
       if (error instanceof AppError) throw error
-      request.onFailure?.(diagnoseError(error))
-      throw new AppError('ai_failed')
+      if (deadline.aborted && !request.signal.aborted) {
+        fail({ httpStatus: null, category: 'timeout', errorClass: 'TimeoutError' })
+      }
+      fail(diagnoseError(error))
     }
   }
 
