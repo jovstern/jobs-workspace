@@ -3,9 +3,9 @@ import { Progress } from 'radix-ui'
 import { useId, useRef } from 'react'
 
 import { Button } from '../../components/Button'
-import { Notice } from '../../components/Notice'
-import { ApiError } from '../../lib/api'
 import { AdviceMissingNotice } from './AdviceMissingNotice'
+import { FitErrorNotice } from './FitErrorNotice'
+import { describeFitError } from './fit-errors'
 import { useFitStore } from './fit-store'
 import { useCheckFit, useIsCheckingFit } from './mutations'
 import { GapsSection } from './GapsSection'
@@ -23,9 +23,6 @@ interface FitPanelProps {
 const NO_RESUME_REASON = 'Add your resume to check your fit.'
 const NO_RESULT_TEXT =
   'No fit check yet. Select Check my fit to compare your resume with these requirements.'
-const GENERIC_ERROR = 'Something went wrong on our side. Try again.'
-const NOT_CONFIGURED_ERROR =
-  'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server.'
 
 // The fit region of the job detail. A check starts only from a click handler here: never on
 // render, selection, refresh, focus, a timer or a reconnect. The result is derived in render from
@@ -35,8 +32,9 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
   const byJobId = useFitStore((state) => state.byJobId)
   const checkFit = useCheckFit()
   const isChecking = useIsCheckingFit(job.id)
-  // The header Check again button, and whether focus should go to it as soon as it exists. Both
-  // are read and written only in event handlers and the ref callback, never during render.
+  // The persistent action button (header Check again, or Check my fit while there is no result),
+  // and whether focus should go to the header one as soon as it exists. Both are read and written
+  // only in event handlers and the ref callback, never during render.
   const actionButton = useRef<HTMLButtonElement | null>(null)
   const focusWhenShown = useRef(false)
 
@@ -46,8 +44,7 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
   const reason = unavailableReason ?? (resume === null ? NO_RESUME_REASON : undefined)
   const isUnavailable = reason !== undefined || isChecking
 
-  const failure = checkFit.isError ? checkFit.error : null
-  const notConfigured = failure instanceof ApiError && failure.code === 'ai_not_configured'
+  const failure = checkFit.isError ? describeFitError(checkFit.error) : null
 
   function setActionButton(element: HTMLButtonElement | null) {
     actionButton.current = element
@@ -57,19 +54,24 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
     }
   }
 
-  // moveFocus: the control used will go away (Check my fit, or the old-result notice), so focus
-  // moves to the header button, now if it exists or as soon as the result shows it.
+  // The control just used goes away when the check starts (Check my fit, the old-result notice or
+  // the error notice), so focus moves to the persistent action button: now if it exists, and for a
+  // first result also as soon as the header Check again appears.
+  function holdFocus() {
+    if (actionButton.current !== null) actionButton.current.focus()
+    if (view === null) focusWhenShown.current = true
+  }
+
   function startCheck(moveFocus: boolean) {
     if (isUnavailable || resume === null) return
-    if (moveFocus) {
-      if (actionButton.current !== null) actionButton.current.focus()
-      else focusWhenShown.current = true
-    }
+    if (moveFocus) holdFocus()
     checkFit.mutate({ jobId: job.id, resumeText: resume.text, resumeHash: resume.textHash })
   }
 
+  // One click is one request, and it is ignored while a check runs.
   function retry() {
     if (isChecking || !checkFit.variables) return
+    holdFocus()
     checkFit.mutate(checkFit.variables)
   }
 
@@ -125,16 +127,7 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
         </Progress.Root>
       ) : null}
 
-      {!isChecking && failure ? (
-        <Notice tone="danger" role="alert" heading="Could not check your fit">
-          <p className="text-base">{notConfigured ? NOT_CONFIGURED_ERROR : GENERIC_ERROR}</p>
-          {notConfigured ? null : (
-            <Button variant="secondary" onClick={retry}>
-              Try again
-            </Button>
-          )}
-        </Notice>
-      ) : null}
+      {!isChecking && failure ? <FitErrorNotice error={failure} onRetry={retry} /> : null}
 
       {!isChecking && view ? (
         <>
@@ -183,6 +176,7 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
           {isChecking ? null : <p className="text-base text-gray-900">{NO_RESULT_TEXT}</p>}
           <Button
             variant="primary"
+            ref={setActionButton}
             aria-disabled={isUnavailable}
             aria-describedby={reason !== undefined ? reasonId : undefined}
             onClick={() => {
