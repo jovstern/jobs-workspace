@@ -2,12 +2,11 @@
 gsd_state_version: "1.0"
 current_phase: "01.2"
 current_phase_name: Resume upload, review and lifecycle
-status: planning
+status: "Phase 01.1 shipped — PR #8"
 stopped_at: Phase 01.1 complete, ready to plan Phase 01.2
-last_updated: "2026-10-12T13:10:27.598Z"
+last_updated: "2026-10-12T13:12:17.791Z"
 last_activity: 2026-10-12
-last_activity_desc: Phase 01.1 complete, transitioned to Phase 01.2
-state_head: fe4587ba2b643db8b3bd3eb8ffaeefb1f2dadaa7
+state_head: 7165a833579ad768e887a9ce3fe9847dcf8c2ef2
 progress:
   total_phases: 9
   completed_phases: 2
@@ -29,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 
 Phase: 01.2 — Resume upload, review and lifecycle
 Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-12 — Phase 01.1 complete, transitioned to Phase 01.2
+Status: Phase 01.1 shipped — PR #8
+Last activity: 2026-10-12
 
 Progress: [██░░░░░░░░] 22%
 
