@@ -1,0 +1,48 @@
+import { expect, test } from 'vitest'
+
+import type { StorageIncident } from '../../lib/storage-incidents'
+import { incidentLine } from './incident-line'
+
+function incident(partial: Omit<StorageIncident, 'id'>): StorageIncident {
+  return { id: 'incident-1', ...partial }
+}
+
+test('resume unreadable, copy kept', () => {
+  expect(incidentLine(incident({ store: 'resume', kind: 'unreadable', copyKept: true }))).toBe(
+    'Your saved resume could not be read, so it was set aside and the page started without it. Add your resume again to continue. A copy is kept in this browser.',
+  )
+})
+
+test('fit checks unreadable, copy kept', () => {
+  expect(incidentLine(incident({ store: 'analyses', kind: 'unreadable', copyKept: true }))).toBe(
+    'Your saved fit checks could not be read, so they were set aside. Run Check my fit again to rebuild them. A copy is kept in this browser.',
+  )
+})
+
+test('resume from a newer version, copy kept', () => {
+  expect(incidentLine(incident({ store: 'resume', kind: 'newer', copyKept: true }))).toBe(
+    'Your saved resume was written by a newer version of this app, so it was set aside and the page started without it. Add your resume again to continue. A copy is kept in this browser.',
+  )
+})
+
+test('fit checks from a newer version, copy kept', () => {
+  expect(incidentLine(incident({ store: 'analyses', kind: 'newer', copyKept: true }))).toBe(
+    'Your saved fit checks were written by a newer version of this app, so they were set aside and the page started without them. Run Check my fit again to rebuild them. A copy is kept in this browser.',
+  )
+})
+
+test('some fit checks dropped, copy kept: singular for one', () => {
+  expect(
+    incidentLine(incident({ store: 'analyses', kind: 'partial', copyKept: true, dropped: 1 })),
+  ).toBe(
+    '1 saved fit check could not be read and was set aside. The others are fine. A copy is kept in this browser.',
+  )
+})
+
+test('some fit checks dropped, copy kept: plural for more', () => {
+  expect(
+    incidentLine(incident({ store: 'analyses', kind: 'partial', copyKept: true, dropped: 3 })),
+  ).toBe(
+    '3 saved fit checks could not be read and were set aside. The others are fine. A copy is kept in this browser.',
+  )
+})

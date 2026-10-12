@@ -170,3 +170,100 @@ test('an entry whose resume hash is not 64 hex characters leaves the store empty
 
   expect(store.getState().byJobId).toEqual({})
 })
+
+function envelope(byJobId: Record<string, unknown>, version = 1) {
+  return JSON.stringify({ state: { byJobId }, version })
+}
+
+test('one valid and one invalid saved fit check: only the invalid one is set aside, and it is not reported again', async () => {
+  localStorage.setItem(
+    'jw:analyses',
+    envelope({ [ANALYSIS.jobId]: ANALYSIS, 'job-backend-mid': { broken: true } }),
+  )
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(Object.keys(store.getState().byJobId)).toEqual([ANALYSIS.jobId])
+  expect(incidents.getState().incidents).toMatchObject([
+    { store: 'analyses', kind: 'partial', dropped: 1, copyKept: true },
+  ])
+  expect(JSON.parse(localStorage.getItem(copyKeys()[0] ?? '') ?? 'null')).toEqual({
+    state: { byJobId: { 'job-backend-mid': { broken: true } } },
+    version: 1,
+  })
+  expect(JSON.parse(localStorage.getItem('jw:analyses') ?? 'null')).toEqual({
+    state: { byJobId: { [ANALYSIS.jobId]: ANALYSIS } },
+    version: 1,
+  })
+
+  vi.resetModules()
+  const second = await loadWithIncidents()
+  expect(Object.keys(second.store.getState().byJobId)).toEqual([ANALYSIS.jobId])
+  expect(second.incidents.getState().incidents).toEqual([])
+  expect(copyKeys()).toHaveLength(1)
+})
+
+test('an entry whose key differs from its jobId is dropped, and kept entries keep their stored order', async () => {
+  const first = { ...ANALYSIS, jobId: 'job-b' }
+  const second = { ...ANALYSIS, jobId: 'job-a' }
+  localStorage.setItem(
+    'jw:analyses',
+    envelope({ 'job-b': first, 'job-wrong': ANALYSIS, 'job-a': second }),
+  )
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(Object.keys(store.getState().byJobId)).toEqual(['job-b', 'job-a'])
+  expect(incidents.getState().incidents).toMatchObject([{ kind: 'partial', dropped: 1 }])
+})
+
+test('three invalid entries are reported as three', async () => {
+  localStorage.setItem('jw:analyses', envelope({ a: 1, b: 2, c: 3, [ANALYSIS.jobId]: ANALYSIS }))
+
+  const { incidents } = await loadWithIncidents()
+
+  expect(incidents.getState().incidents).toMatchObject([{ kind: 'partial', dropped: 3 }])
+})
+
+test.each([
+  ['a missing byJobId', JSON.stringify({ state: {}, version: 1 })],
+  ['a byJobId that is an array', envelope([] as unknown as Record<string, unknown>)],
+  ['a byJobId that is a string', JSON.stringify({ state: { byJobId: 'x' }, version: 1 })],
+])('%s sets the whole value aside as unreadable', async (_name, raw) => {
+  localStorage.setItem('jw:analyses', raw)
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId).toEqual({})
+  expect(incidents.getState().incidents).toMatchObject([{ kind: 'unreadable', copyKept: true }])
+  expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe(raw)
+})
+
+test('a valid empty state loads with no notice', async () => {
+  localStorage.setItem('jw:analyses', envelope({}))
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId).toEqual({})
+  expect(incidents.getState().incidents).toEqual([])
+  expect(copyKeys()).toEqual([])
+})
+
+test('a value from a newer version is set aside as newer', async () => {
+  const raw = envelope({ [ANALYSIS.jobId]: ANALYSIS }, 2)
+  localStorage.setItem('jw:analyses', raw)
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId).toEqual({})
+  expect(incidents.getState().incidents).toMatchObject([{ kind: 'newer', copyKept: true }])
+  expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe(raw)
+})
+
+test('with nothing stored the page starts empty, with no notice, and writes nothing', async () => {
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId).toEqual({})
+  expect(incidents.getState().incidents).toEqual([])
+  expect(localStorage.length).toBe(0)
+})
