@@ -1,5 +1,6 @@
 import type { LearningPlan, Rating } from '@jobs-workspace/shared'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 
 import { GapsSection } from './GapsSection'
@@ -212,4 +213,162 @@ test('the notice slot renders directly under the Gaps heading', () => {
   const group = screen.getByRole('heading', { level: 4, name: 'Required gaps (1)' })
   expect(heading.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   expect(notice.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+const MISSING_PLAN_LINE =
+  'No learning plan was generated for this one. Check again to try once more.'
+const PARTIAL_LEAD_IN = 'This plan covers only what your resume does not yet show.'
+
+test('a nice-to-have plan starts closed behind a Show plan button', () => {
+  renderGaps([], [gap('n1', 'nice_to_have', 'not_evidenced')])
+
+  const trigger = screen.getByRole('button', { name: 'Show plan: Requirement n1' })
+  expect(trigger).toHaveTextContent('Show plan')
+  expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.queryByText('Why it matters for this job')).not.toBeInTheDocument()
+})
+
+test('opening a nice-to-have plan shows it, and the button then reads Hide plan', async () => {
+  const user = userEvent.setup()
+  renderGaps([], [gap('n1', 'nice_to_have', 'not_evidenced')])
+
+  await user.click(screen.getByRole('button', { name: 'Show plan: Requirement n1' }))
+
+  const trigger = screen.getByRole('button', { name: 'Hide plan: Requirement n1' })
+  expect(trigger).toHaveTextContent('Hide plan')
+  expect(trigger).toHaveAttribute('aria-expanded', 'true')
+  expect(screen.getByRole('list', { name: 'What to learn' })).toBeInTheDocument()
+  expect(screen.getByText('Why n1 matters.')).toBeInTheDocument()
+
+  await user.click(trigger)
+
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Show plan: Requirement n1' })).toBeInTheDocument()
+})
+
+test('two Show plan buttons have different accessible names', () => {
+  renderGaps([], [gap('n1', 'nice_to_have', 'not_evidenced'), gap('n2', 'nice_to_have', 'partial')])
+
+  const names = screen
+    .getAllByRole('button', { name: /^Show plan:/ })
+    .map((button) => button.getAttribute('aria-label'))
+  expect(names).toEqual(['Show plan: Requirement n1', 'Show plan: Requirement n2'])
+})
+
+test('a required plan has no Show plan button', () => {
+  renderGaps([gap('r1', 'required', 'not_evidenced')])
+
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByText('What to learn')).toBeInTheDocument()
+})
+
+test('a partial gap leads its plan with what the plan covers; a not evidenced gap does not', () => {
+  renderGaps([gap('r1', 'required', 'partial'), gap('r2', 'required', 'not_evidenced')])
+
+  expect(screen.getAllByText(PARTIAL_LEAD_IN)).toHaveLength(1)
+  const [first, second] = Array.from(
+    screen.getByRole('list', { name: 'Required gaps (2)' }).children,
+  )
+  expect(first).toHaveTextContent(PARTIAL_LEAD_IN)
+  expect(second).not.toHaveTextContent(PARTIAL_LEAD_IN)
+})
+
+test('a gap whose plan is missing says so once, with no button', () => {
+  renderGaps([
+    gap('r1', 'required', 'not_evidenced', { plan: null }),
+    gap('r2', 'required', 'partial'),
+  ])
+
+  expect(screen.getAllByText(MISSING_PLAN_LINE)).toHaveLength(1)
+  const [first, second] = Array.from(
+    screen.getByRole('list', { name: 'Required gaps (2)' }).children,
+  )
+  expect(first).toHaveTextContent(MISSING_PLAN_LINE)
+  expect(within(first as HTMLElement).queryByRole('button')).not.toBeInTheDocument()
+  expect(second).not.toHaveTextContent(MISSING_PLAN_LINE)
+})
+
+test('a nice-to-have gap whose plan is missing shows the line and no Show plan button', () => {
+  renderGaps([], [gap('n1', 'nice_to_have', 'not_evidenced', { plan: null })])
+
+  expect(screen.getByText(MISSING_PLAN_LINE)).toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+})
+
+test('a result without advice shows no plan area, no missing line and no button', () => {
+  renderGaps(
+    [gap('r1', 'required', 'not_evidenced', { plan: null })],
+    [gap('n1', 'nice_to_have', 'partial', { plan: null })],
+    false,
+  )
+
+  expect(screen.queryByText(MISSING_PLAN_LINE)).not.toBeInTheDocument()
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  expect(screen.getByText('Requirement r1')).toBeInTheDocument()
+  expect(screen.getByText('not evidenced in your resume')).toBeInTheDocument()
+})
+
+test('plan text and quotes that look like HTML are shown as literal text', async () => {
+  const user = userEvent.setup()
+  const step = '<b>bold step</b>'
+  const why = '<img src="x" onerror="alert(1)">'
+  const quote = '<script>alert(2)</script>'
+  const { container } = renderGaps(
+    [
+      gap('r1', 'required', 'partial', {
+        quote,
+        plan: plan('r1', { steps: [step], whyItMatters: why }),
+      }),
+    ],
+    [gap('n1', 'nice_to_have', 'not_evidenced', { plan: plan('n1', { steps: [step] }) })],
+  )
+  await user.click(screen.getByRole('button', { name: 'Show plan: Requirement n1' }))
+
+  expect(screen.getAllByText(step).length).toBe(2)
+  expect(screen.getByText(why)).toBeInTheDocument()
+  expect(screen.getByText(quote)).toBeInTheDocument()
+  expect(container.querySelector('b, img, script, a')).toBeNull()
+})
+
+test('opening a plan is forgotten when the section is keyed to a new result', async () => {
+  const user = userEvent.setup()
+  const gaps = { required: [], niceToHave: [gap('n1', 'nice_to_have', 'not_evidenced')] }
+  const { rerender } = render(<GapsSection key="first" gaps={gaps} hasAdvice />)
+  await user.click(screen.getByRole('button', { name: 'Show plan: Requirement n1' }))
+  expect(screen.getByText('What to learn')).toBeInTheDocument()
+
+  rerender(<GapsSection key="second" gaps={gaps} hasAdvice />)
+
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Show plan: Requirement n1' })).toBeInTheDocument()
+})
+
+test('eight gaps with four-step plans put no cap on height, lines or scrolling', () => {
+  const four = ['One', 'Two', 'Three', 'Four']
+  const entries = Array.from({ length: 8 }, (_, index) =>
+    gap(`r${String(index + 1)}`, 'required', 'not_evidenced', {
+      plan: plan(`r${String(index + 1)}`, { steps: four }),
+    }),
+  )
+  const { container } = renderGaps(entries)
+
+  expect(screen.getAllByText('Four')).toHaveLength(8)
+  expect(container.innerHTML).not.toMatch(
+    /truncate|line-clamp|overflow-|max-h-|\bh-\d|text-ellipsis/,
+  )
+})
+
+test('there is no button to claim a skill the resume does not show', () => {
+  renderGaps(
+    [
+      gap('r1', 'required', 'not_evidenced'),
+      gap('r2', 'required', 'not_evidenced', { plan: null }),
+    ],
+    [gap('n1', 'nice_to_have', 'partial')],
+  )
+
+  expect(screen.queryByRole('button', { name: /I do have this/i })).not.toBeInTheDocument()
+  expect(screen.queryByText(/I do have this/i)).not.toBeInTheDocument()
 })
