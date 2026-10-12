@@ -236,6 +236,64 @@ test.describe('with the stand-in model', () => {
     expect(await count.json()).toEqual({ generateContent: 2 })
   })
 
+  test('a stopped app server is named as such, and Try again works once it answers @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+    await request.post(`${STAND_IN}/__reset`)
+    // The dev and preview proxy answers an empty 502 when the app server is down.
+    await page.route('**/api/fit', (route) =>
+      route.fulfill({ status: 502, contentType: 'text/plain', body: '' }),
+    )
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText("Can't reach the app server (is it running?)")
+    await expect(alert.getByRole('button', { name: 'Try again' })).toBeVisible()
+
+    await page.unroute('**/api/fit')
+    await alert.getByRole('button', { name: 'Try again' }).click()
+
+    await expect(page.getByText(BANDS)).toBeVisible()
+    await expect(alert).toHaveCount(0)
+    const count = await request.get(`${STAND_IN}/__count`)
+    expect(await count.json()).toEqual({ generateContent: 1 })
+  })
+
+  test('a refused page address gets its own message and no Try again @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+    await request.post(`${STAND_IN}/__reset`)
+    await page.route('**/api/fit', (route) =>
+      route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: { code: 'forbidden_origin', message: 'Server wording.', retryable: false },
+        }),
+      }),
+    )
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText(
+      "The app server refused this page's address. Open the app at http://localhost:5173 or set ALLOWED_ORIGINS.",
+    )
+    await expect(alert.getByRole('button', { name: 'Try again' })).toHaveCount(0)
+    await expect(alert.getByRole('link')).toHaveCount(0)
+    await expect(page.getByText('Server wording.')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Check my fit' })).toBeVisible()
+    const count = await request.get(`${STAND_IN}/__count`)
+    expect(await count.json()).toEqual({ generateContent: 0 })
+  })
+
   test('a result saved before learning plans existed offers Check again, and one click adds them @fake-only', async ({
     page,
   }) => {

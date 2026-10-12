@@ -3,7 +3,7 @@ import type { z } from 'zod'
 
 const UNREACHABLE_MESSAGE = 'Could not reach the server. Check that it is running and try again.'
 const GENERIC_MESSAGE = 'Something went wrong on our side. Try again.'
-const DEFAULT_TIMEOUT_MS = 60_000
+export const DEFAULT_TIMEOUT_MS = 60_000
 
 // `code` is a plain string because the server may add codes an older client does not know; the
 // message is always safe to show.

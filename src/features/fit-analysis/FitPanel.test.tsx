@@ -393,6 +393,76 @@ test('a second failure with a different code replaces the sentence with the new 
   expect(fetchMock).toHaveBeenCalledTimes(2)
 })
 
+test('a stopped app server (an empty 502) reads as one, with Try again', async () => {
+  fetchMock.mockImplementation(() =>
+    Promise.resolve(new Response('', { status: 502, headers: { 'content-type': 'text/plain' } })),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent("Can't reach the app server (is it running?)")
+  expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
+test('a request that times out reads like an AI timeout, with Try again', async () => {
+  fetchMock.mockImplementation(() =>
+    Promise.reject(new DOMException('The operation timed out.', 'TimeoutError')),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const timedOut = await screen.findByRole('alert')
+  expect(timedOut).toHaveTextContent('The request took too long. Try again.')
+  expect(within(timedOut).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_timeout', 504)))
+  await userEvent.setup().click(within(timedOut).getByRole('button', { name: 'Try again' }))
+
+  await waitFor(() => {
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+  expect(await screen.findByRole('alert')).toHaveTextContent(
+    'The request took too long. Try again.',
+  )
+})
+
+test.each([
+  ['an unknown code that is not retryable', 'brand_new_code', 500],
+  ['a validation_error', 'validation_error', 400],
+])('%s says to reload and offers no Try again', async (_name, code, status) => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse(code, status, false)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(
+    'Something went wrong on our side. Reload the page and check again.',
+  )
+  expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
+})
+
+test("this app's own request limit is never worded as Google's", async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('too_many_requests', 429)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(
+    'Too many requests in a short time. Wait a minute, then try again.',
+  )
+  expect(alert).not.toHaveTextContent("Google's AI")
+  expect(within(alert).getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+})
+
 test('the longest sentence is shown whole in a container that wraps it', async () => {
   fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_rate_limited', 429)))
   const user = userEvent.setup()
