@@ -45,17 +45,22 @@ test('hydrates a valid stored value before the first render', async () => {
   expect(store.getState().byJobId[ANALYSIS.jobId]).toEqual(ANALYSIS)
 })
 
-test('sets aside a stored value of the wrong shape, reports it, and starts empty', async () => {
-  const raw = JSON.stringify({ state: { byJobId: { x: { not: 'an analysis' } } }, version: 1 })
-  localStorage.setItem('jw:analyses', raw)
+test('sets aside a stored entry of the wrong shape, reports it, and starts empty', async () => {
+  localStorage.setItem(
+    'jw:analyses',
+    JSON.stringify({ state: { byJobId: { x: { not: 'an analysis' } } }, version: 1 }),
+  )
 
   const { store, incidents } = await loadWithIncidents()
 
   expect(store.getState().byJobId).toEqual({})
   expect(copyKeys()).toHaveLength(1)
-  expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe(raw)
+  expect(JSON.parse(localStorage.getItem(copyKeys()[0] ?? '') ?? 'null')).toEqual({
+    state: { byJobId: { x: { not: 'an analysis' } } },
+    version: 1,
+  })
   expect(incidents.getState().incidents).toMatchObject([
-    { store: 'analyses', kind: 'unreadable', copyKept: true },
+    { store: 'analyses', kind: 'partial', dropped: 1, copyKept: true },
   ])
 })
 

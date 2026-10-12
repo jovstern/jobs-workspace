@@ -27,6 +27,25 @@ interface GuardedStorageOptions<S> {
   report?: Report
 }
 
+interface Envelope {
+  state: unknown
+  version: number
+}
+
+// What Zustand writes: an object with a `state` and an integer `version`. A missing version is
+// not treated as the current one, as Zustand would.
+function isEnvelope(value: unknown): value is Envelope {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'state' in value &&
+    'version' in value &&
+    typeof value.version === 'number' &&
+    Number.isInteger(value.version)
+  )
+}
+
 // Reading is synchronous, which is what lets a store be filled before the first render.
 export interface GuardedStorage<S> extends PersistStorage<S> {
   getItem: (name: string) => StorageValue<S> | null
@@ -37,7 +56,7 @@ export interface GuardedStorage<S> extends PersistStorage<S> {
 // happen when the value is read. Nothing in this module logs, and nothing it reports carries the
 // stored value, a validation issue or an error message.
 export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): GuardedStorage<S> {
-  const { store, version, validate } = options
+  const { store, version, migrations, validate } = options
   const keep = options.keep ?? SET_ASIDE_KEEP
   const now = options.now ?? (() => new Date())
   const getStorage = options.getStorage ?? (() => window.localStorage)
@@ -130,26 +149,44 @@ export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): Guar
       } catch {
         return setAsideWhole(storage, name, raw, 'unreadable')
       }
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        Array.isArray(parsed) ||
-        !('state' in parsed) ||
-        !('version' in parsed) ||
-        !Number.isInteger(parsed.version)
-      ) {
-        return setAsideWhole(storage, name, raw, 'unreadable')
+      if (!isEnvelope(parsed)) return setAsideWhole(storage, name, raw, 'unreadable')
+      // Never run a reader for the current version over data a newer version wrote.
+      if (parsed.version > version) return setAsideWhole(storage, name, raw, 'newer')
+
+      let state: unknown = parsed.state
+      let migrated = false
+      for (let from = parsed.version; from < version; from += 1) {
+        const step = migrations[from]
+        if (step === undefined) return setAsideWhole(storage, name, raw, 'unreadable')
+        try {
+          state = step(state)
+        } catch {
+          return setAsideWhole(storage, name, raw, 'unreadable')
+        }
+        migrated = true
       }
-      // A different version is handled with migrations; until then it is unreadable.
-      if (parsed.version !== version) return setAsideWhole(storage, name, raw, 'unreadable')
 
       let result: ValidResult<S> | null
       try {
-        result = validate(parsed.state)
+        result = validate(state)
       } catch {
         result = null
       }
       if (result === null) return setAsideWhole(storage, name, raw, 'unreadable')
+
+      if (result.droppedCount > 0) {
+        // The same envelope as live data, so a later reader can use the copy as it is.
+        const copyKept = setAside(storage, name, JSON.stringify({ state: result.dropped, version }))
+        report({ store, kind: 'partial', copyKept, dropped: result.droppedCount })
+      }
+      // Without this the same entries would be found and reported again on every reload.
+      if (migrated || result.droppedCount > 0) {
+        try {
+          storage.setItem(name, JSON.stringify({ state: result.state, version }))
+        } catch {
+          // The cleaned value is written again by the next save.
+        }
+      }
       return { state: result.state, version }
     },
 

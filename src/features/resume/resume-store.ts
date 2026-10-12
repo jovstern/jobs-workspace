@@ -9,9 +9,22 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { z } from 'zod'
 
+import { createGuardedStorage } from '../../lib/guarded-storage'
 import { sha256Hex } from '../../lib/sha256'
 
 const persistedSchema = z.object({ resume: storedResumeSchema.nullable() })
+type PersistedResume = z.infer<typeof persistedSchema>
+
+// A value that does not validate is set aside whole; there is nothing to keep entry by entry.
+const storage = createGuardedStorage<PersistedResume>({
+  store: 'resume',
+  version: 1,
+  migrations: {},
+  validate: (state) => {
+    const parsed = persistedSchema.safeParse(state)
+    return parsed.success ? { state: parsed.data, dropped: null, droppedCount: 0 } : null
+  },
+})
 
 interface ResumeState {
   resume: StoredResume | null
@@ -33,12 +46,8 @@ export const useResumeStore = create<ResumeState>()(
       name: 'jw:resume',
       version: 1,
       partialize: (state) => ({ resume: state.resume }),
-      // Stored data comes from an earlier session and may be damaged or edited. A value that does
-      // not validate is ignored and the page starts empty (set-aside and notice are DATA-02).
-      merge: (persisted, current) => {
-        const parsed = persistedSchema.safeParse(persisted)
-        return parsed.success ? { ...current, resume: parsed.data.resume } : current
-      },
+      // Reading, versioning, validating and setting aside bad data all happen in the storage.
+      storage,
     },
   ),
 )
