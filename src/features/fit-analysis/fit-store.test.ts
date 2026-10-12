@@ -23,6 +23,17 @@ async function loadStore() {
   return (await import('./fit-store')).useFitStore
 }
 
+// The incident store is a module too: it must come from the same fresh module graph as the store.
+async function loadWithIncidents() {
+  const store = await loadStore()
+  const incidents = (await import('../../lib/storage-incidents')).useStorageIncidents
+  return { store, incidents }
+}
+
+function copyKeys(): string[] {
+  return Object.keys(localStorage).filter((key) => key.startsWith('jw:analyses:corrupt:'))
+}
+
 test('hydrates a valid stored value before the first render', async () => {
   localStorage.setItem(
     'jw:analyses',
@@ -34,23 +45,58 @@ test('hydrates a valid stored value before the first render', async () => {
   expect(store.getState().byJobId[ANALYSIS.jobId]).toEqual(ANALYSIS)
 })
 
-test('ignores a stored value of the wrong shape and starts empty', async () => {
-  localStorage.setItem(
-    'jw:analyses',
-    JSON.stringify({ state: { byJobId: { x: { not: 'an analysis' } } }, version: 1 }),
-  )
+test('sets aside a stored value of the wrong shape, reports it, and starts empty', async () => {
+  const raw = JSON.stringify({ state: { byJobId: { x: { not: 'an analysis' } } }, version: 1 })
+  localStorage.setItem('jw:analyses', raw)
 
-  const store = await loadStore()
+  const { store, incidents } = await loadWithIncidents()
 
   expect(store.getState().byJobId).toEqual({})
+  expect(copyKeys()).toHaveLength(1)
+  expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe(raw)
+  expect(incidents.getState().incidents).toMatchObject([
+    { store: 'analyses', kind: 'unreadable', copyKept: true },
+  ])
 })
 
-test('ignores unparseable stored text and starts empty', async () => {
+test('sets aside unparseable stored text, reports it, and starts empty', async () => {
   localStorage.setItem('jw:analyses', '{not json')
 
-  const store = await loadStore()
+  const { store, incidents } = await loadWithIncidents()
 
   expect(store.getState().byJobId).toEqual({})
+  expect(copyKeys()).toHaveLength(1)
+  expect(localStorage.getItem(copyKeys()[0] ?? '')).toBe('{not json')
+  expect(localStorage.getItem('jw:analyses')).toBeNull()
+  expect(incidents.getState().incidents).toHaveLength(1)
+})
+
+test('a Phase 1 shaped value loads unchanged, reports nothing, and is not rewritten', async () => {
+  const raw = JSON.stringify({ state: { byJobId: { [ANALYSIS.jobId]: ANALYSIS } }, version: 1 })
+  localStorage.setItem('jw:analyses', raw)
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId[ANALYSIS.jobId]).toEqual(ANALYSIS)
+  expect(incidents.getState().incidents).toEqual([])
+  expect(localStorage.getItem('jw:analyses')).toBe(raw)
+  expect(copyKeys()).toEqual([])
+})
+
+test('a value whose analysis carries an advice object loads', async () => {
+  const withAdvice = {
+    ...ANALYSIS,
+    advice: { plans: [], tailoring: null },
+  }
+  localStorage.setItem(
+    'jw:analyses',
+    JSON.stringify({ state: { byJobId: { [ANALYSIS.jobId]: withAdvice } }, version: 1 }),
+  )
+
+  const { store, incidents } = await loadWithIncidents()
+
+  expect(store.getState().byJobId[ANALYSIS.jobId]?.advice).toEqual(withAdvice.advice)
+  expect(incidents.getState().incidents).toEqual([])
 })
 
 test('saveAnalysis replaces the entry for that job and persists it', async () => {
