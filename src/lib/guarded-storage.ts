@@ -86,22 +86,39 @@ export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): Guar
   }
 
   function pruneCopies(storage: Storage, name: string) {
-    const keys = copyKeysOf(storage, name)
-    for (const key of keys.slice(0, Math.max(0, keys.length - keep))) {
-      storage.removeItem(key)
+    try {
+      const keys = copyKeysOf(storage, name)
+      for (const key of keys.slice(0, Math.max(0, keys.length - keep))) {
+        storage.removeItem(key)
+      }
+    } catch {
+      // A copy that could not be pruned is pruned after the next set-aside.
     }
   }
 
-  // Copies the text exactly as given to a new key. Returns whether a copy now exists.
+  function writeCopy(storage: Storage, name: string, text: string) {
+    const base = `${name}:corrupt:${now().toISOString()}`
+    let key = base
+    for (let suffix = 1; storage.getItem(key) !== null; suffix += 1) {
+      key = `${base}-${String(suffix)}`
+    }
+    storage.setItem(key, text)
+    pruneCopies(storage, name)
+  }
+
+  // Copies the text exactly as given to a new key. A full disk is the usual reason a copy fails,
+  // so the older copies of this store are given up once and the write is tried again. Returns
+  // whether a copy now exists.
   function setAside(storage: Storage, name: string, text: string): boolean {
     try {
-      const base = `${name}:corrupt:${now().toISOString()}`
-      let key = base
-      for (let suffix = 1; storage.getItem(key) !== null; suffix += 1) {
-        key = `${base}-${String(suffix)}`
-      }
-      storage.setItem(key, text)
-      pruneCopies(storage, name)
+      writeCopy(storage, name, text)
+      return true
+    } catch {
+      // Fall through to the retry.
+    }
+    try {
+      for (const key of copyKeysOf(storage, name)) storage.removeItem(key)
+      writeCopy(storage, name, text)
       return true
     } catch {
       return false
@@ -184,7 +201,7 @@ export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): Guar
         try {
           storage.setItem(name, JSON.stringify({ state: result.state, version }))
         } catch {
-          // The cleaned value is written again by the next save.
+          report({ store, kind: 'write_failed', copyKept: false })
         }
       }
       return { state: result.state, version }
@@ -194,7 +211,9 @@ export function createGuardedStorage<S>(options: GuardedStorageOptions<S>): Guar
       try {
         open()?.setItem(name, JSON.stringify(value))
       } catch {
-        // A failed save never fails the action that caused it; the state stays in memory.
+        // A failed save never fails the action that caused it: the state stays in memory and the
+        // notice says the latest changes were not saved.
+        report({ store, kind: 'write_failed', copyKept: false })
       }
     },
 
