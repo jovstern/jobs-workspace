@@ -336,3 +336,159 @@ test('two set-asides at the same instant produce two keys and neither overwrites
   expect(localStorage.getItem(base)).toBe('{first')
   expect(localStorage.getItem(`${base}-1`)).toBe('{second')
 })
+
+// A storage that can be told to refuse writes, to stand in for a full disk.
+class MemoryStorage implements Storage {
+  [name: string]: unknown
+  private readonly data = new Map<string, string>()
+  failWrites: (key: string) => boolean = () => false
+
+  get length() {
+    return this.data.size
+  }
+  key(index: number) {
+    return [...this.data.keys()][index] ?? null
+  }
+  getItem(key: string) {
+    return this.data.get(key) ?? null
+  }
+  setItem(key: string, value: string) {
+    if (this.failWrites(key)) throw new DOMException('full', 'QuotaExceededError')
+    this.data.set(key, value)
+  }
+  removeItem(key: string) {
+    this.data.delete(key)
+  }
+  clear() {
+    this.data.clear()
+  }
+}
+
+function setupOn(memory: Storage) {
+  const report = vi.fn<Report>()
+  const storage = createGuardedStorage<Counter>({
+    store: 'analyses',
+    version: 1,
+    migrations: {},
+    validate: validateCounter,
+    now: () => NOW,
+    getStorage: () => memory,
+    report,
+  })
+  return { storage, report }
+}
+
+test('a write that throws returns normally and reports write_failed', () => {
+  const memory = new MemoryStorage()
+  memory.failWrites = () => true
+  const { storage, report } = setupOn(memory)
+
+  expect(() => {
+    storage.setItem(KEY, { state: { n: 1 }, version: 1 })
+  }).not.toThrow()
+
+  expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'write_failed', copyKept: false })
+})
+
+test('a real Zustand store keeps the new state in memory when its write fails', () => {
+  const memory = new MemoryStorage()
+  memory.failWrites = () => true
+  const { storage } = setupOn(memory)
+  const store = create<Counter>()(persist(() => ({ n: 0 }), { name: KEY, version: 1, storage }))
+
+  expect(() => {
+    store.setState({ n: 9 })
+  }).not.toThrow()
+
+  expect(store.getState().n).toBe(9)
+})
+
+test('storage that cannot be read reports write_failed and the store runs in memory', () => {
+  const memory = new MemoryStorage()
+  memory.getItem = () => {
+    throw new DOMException('blocked', 'SecurityError')
+  }
+  const { storage, report } = setupOn(memory)
+
+  expect(storage.getItem(KEY)).toBeNull()
+
+  expect(report).toHaveBeenCalledTimes(1)
+  expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'write_failed', copyKept: false })
+})
+
+test('when the copy cannot be written, older copies are removed and the write is tried once more', () => {
+  const memory = new MemoryStorage()
+  for (const time of ['01', '02', '03']) {
+    memory.setItem(`${KEY}:corrupt:2026-10-12T09:00:${time}.000Z`, 'old')
+  }
+  memory.setItem(KEY, '{broken')
+  // Full until an older copy is removed.
+  memory.failWrites = (key) =>
+    key.startsWith(`${KEY}:corrupt:`) && memory.key(0) !== null && memory.length >= 4
+  const { storage, report } = setupOn(memory)
+
+  expect(storage.getItem(KEY)).toBeNull()
+
+  const copies = [...Array(memory.length).keys()]
+    .map((index) => memory.key(index) ?? '')
+    .filter((key) => key.startsWith(`${KEY}:corrupt:`))
+  expect(copies).toEqual([`${KEY}:corrupt:${NOW.toISOString()}`])
+  expect(memory.getItem(KEY)).toBeNull()
+  expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'unreadable', copyKept: true })
+})
+
+test('when the copy still cannot be written the incident says so and the original is left alone', () => {
+  const memory = new MemoryStorage()
+  memory.setItem(KEY, '{secret-marker-77')
+  memory.failWrites = (key) => key.startsWith(`${KEY}:corrupt:`)
+  const { storage, report } = setupOn(memory)
+
+  expect(storage.getItem(KEY)).toBeNull()
+
+  expect(memory.getItem(KEY)).toBe('{secret-marker-77')
+  expect(report).toHaveBeenCalledTimes(1)
+  expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'unreadable', copyKept: false })
+  expect(JSON.stringify(report.mock.calls)).not.toContain('secret-marker-77')
+})
+
+test('a newer version whose copy cannot be written leaves the original and says so', () => {
+  const memory = new MemoryStorage()
+  const raw = JSON.stringify({ state: { n: 1 }, version: 5 })
+  memory.setItem(KEY, raw)
+  memory.failWrites = (key) => key.startsWith(`${KEY}:corrupt:`)
+  const { storage, report } = setupOn(memory)
+
+  expect(storage.getItem(KEY)).toBeNull()
+
+  expect(memory.getItem(KEY)).toBe(raw)
+  expect(report).toHaveBeenCalledWith({ store: 'analyses', kind: 'newer', copyKept: false })
+})
+
+test('dropped entries whose copy cannot be written are reported with copyKept false', () => {
+  const memory = new MemoryStorage()
+  memory.setItem(KEY, JSON.stringify({ state: { items: { a: 1, b: 'x' } }, version: 1 }))
+  memory.failWrites = (key) => key.startsWith(`${KEY}:corrupt:`)
+  const report = vi.fn<Report>()
+  const storage = createGuardedStorage<Items>({
+    store: 'analyses',
+    version: 1,
+    migrations: {},
+    validate: () => ({
+      state: { items: { a: 1 } },
+      dropped: { items: { b: 'x' } },
+      droppedCount: 1,
+    }),
+    now: () => NOW,
+    getStorage: () => memory,
+    report,
+  })
+
+  expect(storage.getItem(KEY)).toEqual({ state: { items: { a: 1 } }, version: 1 })
+
+  expect(report).toHaveBeenCalledWith({
+    store: 'analyses',
+    kind: 'partial',
+    dropped: 1,
+    copyKept: false,
+  })
+})

@@ -272,3 +272,21 @@ test('with nothing stored the page starts empty, with no notice, and writes noth
   expect(incidents.getState().incidents).toEqual([])
   expect(localStorage.length).toBe(0)
 })
+
+test('saveAnalysis does not throw when the browser refuses the write, and says so once', async () => {
+  const { store, incidents } = await loadWithIncidents()
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('full', 'QuotaExceededError')
+  })
+
+  expect(() => {
+    store.getState().saveAnalysis(ANALYSIS)
+    store.getState().saveAnalysis({ ...ANALYSIS, jobId: 'job-other' })
+  }).not.toThrow()
+
+  expect(Object.keys(store.getState().byJobId)).toEqual([ANALYSIS.jobId, 'job-other'])
+  expect(incidents.getState().incidents).toMatchObject([
+    { store: 'analyses', kind: 'write_failed', copyKept: false },
+  ])
+  vi.restoreAllMocks()
+})

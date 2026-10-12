@@ -51,3 +51,35 @@ test('has no button other than Dismiss', () => {
 
   expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Dismiss'])
 })
+
+test('three incidents render three lines in report order with one Dismiss button', () => {
+  render(<StorageNotice />)
+  act(() => {
+    const { report } = useStorageIncidents.getState()
+    report({ store: 'resume', kind: 'unreadable', copyKept: true })
+    report({ store: 'analyses', kind: 'partial', copyKept: true, dropped: 1 })
+    report({ store: 'analyses', kind: 'write_failed', copyKept: false })
+  })
+
+  const lines = screen.getAllByRole('listitem').map((item) => item.textContent)
+  expect(lines[0]).toMatch(/^Your saved resume could not be read/)
+  expect(lines[1]).toMatch(/^1 saved fit check could not be read/)
+  expect(lines[2]).toMatch(/^Your browser could not save/)
+  expect(screen.getAllByRole('button')).toHaveLength(1)
+})
+
+test('the notice never offers or mentions download, restore, export or erase', () => {
+  render(<StorageNotice />)
+  act(() => {
+    const { report } = useStorageIncidents.getState()
+    for (const store of ['resume', 'analyses'] as const) {
+      for (const kind of ['unreadable', 'newer', 'partial', 'write_failed'] as const) {
+        for (const copyKept of [true, false]) {
+          report({ store, kind, copyKept, dropped: 2 })
+        }
+      }
+    }
+  })
+
+  expect(screen.getByRole('alert').textContent).not.toMatch(/download|restore|export|erase/i)
+})
