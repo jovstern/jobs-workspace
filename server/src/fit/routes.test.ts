@@ -218,6 +218,11 @@ describe('model and upstream failures', () => {
     ['blocked', 422, 'ai_blocked', false],
     ['truncated', 502, 'ai_truncated', true],
     ['garbage', 502, 'ai_invalid_output', true],
+    ['finish_safety', 422, 'ai_blocked', false],
+    ['finish_unexpected', 502, 'ai_failed', true],
+    ['empty', 502, 'ai_invalid_output', true],
+    ['no_candidate', 502, 'ai_invalid_output', true],
+    ['empty_ratings', 502, 'ai_invalid_output', true],
   ] as const)(
     '%s answers %i %s after exactly one upstream request',
     async (scenario, expectedStatus, expectedCode, expectedRetryable) => {
@@ -277,7 +282,7 @@ describe('model and upstream failures', () => {
   })
 })
 
-test('a missed deadline rejects with ai_failed', async () => {
+test('a missed deadline rejects with ai_timeout', async () => {
   fake.setScenario('slow')
 
   await expect(
@@ -289,7 +294,25 @@ test('a missed deadline rejects with ai_failed', async () => {
       signal: new AbortController().signal,
       overrides: { deadlineMs: 200 },
     }),
-  ).rejects.toMatchObject({ code: 'ai_failed' })
+  ).rejects.toMatchObject({ code: 'ai_timeout' })
+})
+
+test('a slow answer that ends in time still succeeds with every rating', async () => {
+  const slow = await startFakeGemini({ slowDelayMs: 300 })
+  const slowAi = createGeminiClient({ apiKey: API_KEY, baseUrl: slow.url })
+  const slowApp = await listen(createApp({ ai: slowAi }))
+  try {
+    slow.setScenario('slow')
+
+    const { status, text } = await postFit(slowApp.url, { jobId: JOB_ID, resumeText: RESUME_A })
+
+    expect(status).toBe(200)
+    expect(fitResponseSchema.parse(JSON.parse(text)).ratings).toHaveLength(8)
+    expect(slow.requestCount()).toBe(1)
+  } finally {
+    slowApp.server.close()
+    await slow.close()
+  }
 })
 
 test('two simultaneous requests with different resumes get quotes only from their own resume', async () => {

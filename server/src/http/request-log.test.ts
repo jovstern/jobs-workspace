@@ -207,6 +207,8 @@ describe('a failed model call', () => {
     ['blocked', 422, 'ai_blocked', 'fit failed status=none category=blocked'],
     ['truncated', 502, 'ai_truncated', 'fit failed status=none category=unfinished'],
     ['garbage', 502, 'ai_invalid_output', 'fit failed status=none category=invalid_json'],
+    ['finish_safety', 422, 'ai_blocked', 'fit failed status=none category=blocked'],
+    ['empty', 502, 'ai_invalid_output', 'fit failed status=none category=empty_text'],
   ] as const)(
     '%s writes one status-and-category line, then the request line',
     async (scenario, expectedStatus, expectedCode, expected) => {

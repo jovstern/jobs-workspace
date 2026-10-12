@@ -18,6 +18,11 @@ export type Scenario =
   | 'blocked'
   | 'truncated'
   | 'garbage'
+  | 'finish_safety'
+  | 'finish_unexpected'
+  | 'empty'
+  | 'no_candidate'
+  | 'empty_ratings'
   | 'slow'
   | 'hallucinated_quote'
   | 'advice_malformed'
@@ -30,6 +35,11 @@ const SCENARIOS: readonly Scenario[] = [
   'blocked',
   'truncated',
   'garbage',
+  'finish_safety',
+  'finish_unexpected',
+  'empty',
+  'no_candidate',
+  'empty_ratings',
   'slow',
   'hallucinated_quote',
   'advice_malformed',
@@ -445,9 +455,34 @@ function parseJson(text: string): unknown {
   }
 }
 
+type PromptScenario = 'ok' | 'hallucinated_quote' | 'advice_malformed' | 'advice_partial'
+
+// The rule-based answer to a fit prompt. The malformed and partial scenarios keep the ratings of
+// "ok" and break only the advice.
+function answerFromPrompt(response: ServerResponse, body: unknown, scenario: PromptScenario): void {
+  const prompt = parsePrompt(body)
+  if (prompt === null) {
+    sendJson(response, 400, {
+      error: { code: 400, message: 'Unrecognised prompt.', status: 'INVALID_ARGUMENT' },
+    })
+    return
+  }
+  const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
+  const answer =
+    scenario === 'advice_malformed'
+      ? { ratings, plans: 'not a list of plans', tailoring: ['not an object'] }
+      : scenario === 'advice_partial'
+        ? { ratings, ...partialAdviceFromRatings(prompt, ratings) }
+        : { ratings, ...adviceFromRatings(prompt, ratings) }
+  sendJson(response, 200, textResponse(JSON.stringify(answer), 'STOP'))
+}
+
 const GENERATE_PATH = /^\/v1beta\/models\/[^/:]+:generateContent$/
 
-export async function startFakeGemini(options: { port?: number } = {}): Promise<FakeGemini> {
+export async function startFakeGemini(
+  options: { port?: number; slowDelayMs?: number } = {},
+): Promise<FakeGemini> {
+  const slowDelayMs = options.slowDelayMs ?? SLOW_DELAY_MS
   let scenario: Scenario = 'ok'
   let count = 0
   let last: RecordedRequest | null = null
@@ -481,10 +516,26 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
       case 'garbage':
         sendJson(response, 200, textResponse('this is not json {', 'STOP'))
         return
+      case 'finish_safety':
+        sendJson(response, 200, { candidates: [{ finishReason: 'SAFETY' }] })
+        return
+      case 'finish_unexpected':
+        sendJson(response, 200, { candidates: [{ finishReason: 'MALFORMED_FUNCTION_CALL' }] })
+        return
+      case 'empty':
+        sendJson(response, 200, textResponse('', 'STOP'))
+        return
+      case 'no_candidate':
+        sendJson(response, 200, { candidates: [] })
+        return
+      case 'empty_ratings':
+        sendJson(response, 200, textResponse(JSON.stringify({ ratings: [] }), 'STOP'))
+        return
       case 'slow': {
+        // Ends well after the delay, exactly as "ok" does, so a slow check can be shown succeeding.
         const timer = setTimeout(() => {
-          sendJson(response, 200, textResponse('{"ratings":[]}', 'STOP'))
-        }, SLOW_DELAY_MS)
+          answerFromPrompt(response, body, 'ok')
+        }, slowDelayMs)
         response.on('close', () => {
           clearTimeout(timer)
         })
@@ -493,25 +544,9 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
       case 'ok':
       case 'hallucinated_quote':
       case 'advice_malformed':
-      case 'advice_partial': {
-        const prompt = parsePrompt(body)
-        if (prompt === null) {
-          sendJson(response, 400, {
-            error: { code: 400, message: 'Unrecognised prompt.', status: 'INVALID_ARGUMENT' },
-          })
-          return
-        }
-        const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
-        // The malformed and partial scenarios keep the ratings of "ok" and break only the advice.
-        const answer =
-          scenario === 'advice_malformed'
-            ? { ratings, plans: 'not a list of plans', tailoring: ['not an object'] }
-            : scenario === 'advice_partial'
-              ? { ratings, ...partialAdviceFromRatings(prompt, ratings) }
-              : { ratings, ...adviceFromRatings(prompt, ratings) }
-        sendJson(response, 200, textResponse(JSON.stringify(answer), 'STOP'))
+      case 'advice_partial':
+        answerFromPrompt(response, body, scenario)
         return
-      }
     }
   }
 
