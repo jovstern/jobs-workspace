@@ -153,6 +153,22 @@ test.describe('with the stand-in model', () => {
     await expect(
       requiredGaps.getByText(/^Rough effort: (days|weeks|months)$/).first(),
     ).toBeVisible()
+
+    // Partly evidenced requirements say so, and their plan covers only what is missing.
+    await expect(requiredGaps.getByText('partly evidenced in your resume').first()).toBeVisible()
+    await expect(
+      requiredGaps.getByText('This plan covers only what your resume does not yet show.').first(),
+    ).toBeVisible()
+
+    // A nice-to-have plan starts closed and opens with one click.
+    const niceGaps = page.getByRole('list', { name: 'Nice-to-have gaps (2)' })
+    await expect(niceGaps.getByText('What to learn')).toHaveCount(0)
+    await niceGaps
+      .getByRole('button', { name: /^Show plan:/ })
+      .first()
+      .click()
+    await expect(niceGaps.getByRole('button', { name: /^Hide plan:/ })).toHaveCount(1)
+    await expect(niceGaps.getByText('What to learn')).toHaveCount(1)
   })
 
   test('a quote the resume does not contain is shown as not evidenced @fake-only', async ({
@@ -169,6 +185,11 @@ test.describe('with the stand-in model', () => {
       page.getByText(
         'The AI cited text we could not find in your resume, so this was marked not evidenced.',
       ),
+    ).toHaveCount(1)
+
+    // The withdrawn rating leaves one gap with no plan; it says so once.
+    await expect(
+      page.getByText('No learning plan was generated for this one. Check again to try once more.'),
     ).toHaveCount(1)
   })
 
