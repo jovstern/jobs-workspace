@@ -211,19 +211,20 @@ test.describe('with the stand-in model', () => {
     ).toHaveCount(1)
   })
 
-  test('a failed check can be retried with one click, and each click is one request @fake-only', async ({
+  test("a rate-limited check shows Google's message, and one Try again click is one retry @fake-only", async ({
     page,
     request,
   }) => {
     await saveResume(page)
     await request.post(`${STAND_IN}/__reset`)
-    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'http_503' } })
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'http_429' } })
 
     await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
     await page.getByRole('button', { name: 'Check my fit' }).click()
 
     const alert = page.getByRole('alert')
-    await expect(alert).toContainText('Something went wrong on our side. Try again.')
+    await expect(alert).toContainText('Could not check your fit')
+    await expect(alert).toContainText("Google's AI is rate limiting this key.")
     await expect(alert.getByRole('button', { name: 'Try again' })).toBeVisible()
 
     await request.post(`${STAND_IN}/__scenario`, { data: { name: 'ok' } })
