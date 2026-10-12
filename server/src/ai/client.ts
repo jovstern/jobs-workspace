@@ -21,7 +21,11 @@ export interface GenerateJsonRequest<T> {
   task: AiTask
   system: string
   userText: string
+  // What the answer is parsed with.
   schema: z.ZodType<T>
+  // What the provider is shown. Defaults to `schema`; set it when the parse schema is more lenient
+  // than the one the provider should be asked to follow.
+  wireSchema?: z.ZodType
   signal: AbortSignal
   overrides?: {
     thinking?: ThinkingLevelName
@@ -78,7 +82,7 @@ export function createGeminiClient(options: GeminiClientOptions): AiClient {
         config: {
           systemInstruction: request.system,
           responseMimeType: 'application/json',
-          responseJsonSchema: toGeminiSchema(request.schema),
+          responseJsonSchema: toGeminiSchema(request.wireSchema ?? request.schema),
           thinkingConfig: {
             thinkingLevel: THINKING_LEVELS[request.overrides?.thinking ?? model.thinking],
           },

@@ -8,6 +8,7 @@ import {
   FIT_PROMPT_VERSION,
   FIT_SYSTEM_INSTRUCTION,
   fitModelOutputSchema,
+  fitModelParseSchema,
 } from './prompts/fit'
 import { toGeminiSchema } from './schema'
 
@@ -188,6 +189,59 @@ describe('toGeminiSchema on the fit model-output schema', () => {
     },
   )
 
+  test('orders the answer ratings, plans, tailoring and each plan requirementId, steps, whyItMatters, effort', () => {
+    const schema = toGeminiSchema(fitModelOutputSchema(['a', 'b', 'c', 'd', 'e', 'f'])) as {
+      propertyOrdering: string[]
+      properties: {
+        plans: { items: { propertyOrdering: string[] } }
+        tailoring: { propertyOrdering: string[] }
+      }
+    }
+
+    expect(schema.propertyOrdering).toEqual(['ratings', 'plans', 'tailoring'])
+    expect(schema.properties.plans.items.propertyOrdering).toEqual([
+      'requirementId',
+      'steps',
+      'whyItMatters',
+      'effort',
+    ])
+    expect(schema.properties.tailoring.propertyOrdering).toEqual(['emphasise', 'keywords'])
+  })
+
+  test.each([6, 10])('bounds plans, steps, tips and keywords for a %i-requirement job', (count) => {
+    const ids = testJob(count).requirements.map((requirement) => requirement.id)
+
+    const schema = toGeminiSchema(fitModelOutputSchema(ids)) as {
+      properties: {
+        plans: {
+          maxItems: number
+          items: {
+            properties: {
+              requirementId: { enum: string[] }
+              steps: { minItems: number; maxItems: number }
+              effort: { enum: string[] }
+            }
+          }
+        }
+        tailoring: {
+          properties: { emphasise: { maxItems: number }; keywords: { maxItems: number } }
+        }
+      }
+    }
+
+    expect(schema.properties.plans.maxItems).toBe(count)
+    expect(schema.properties.plans.items.properties.requirementId.enum).toEqual(ids)
+    expect(schema.properties.plans.items.properties.steps.minItems).toBe(2)
+    expect(schema.properties.plans.items.properties.steps.maxItems).toBe(4)
+    expect(schema.properties.plans.items.properties.effort.enum).toEqual([
+      'days',
+      'weeks',
+      'months',
+    ])
+    expect(schema.properties.tailoring.properties.emphasise.maxItems).toBe(5)
+    expect(schema.properties.tailoring.properties.keywords.maxItems).toBe(8)
+  })
+
   test('has no score, band or percentage field anywhere', () => {
     const schema = JSON.stringify(
       toGeminiSchema(fitModelOutputSchema(['a', 'b', 'c', 'd', 'e', 'f'])),
@@ -203,9 +257,41 @@ describe('toGeminiSchema on the fit model-output schema', () => {
   })
 })
 
+describe('fitModelParseSchema', () => {
+  const ids = ['a', 'b']
+  const rating = (requirementId: string) => ({
+    requirementId,
+    quote: null,
+    rating: 'not_evidenced',
+    rationale: 'No evidence.',
+  })
+
+  test('accepts an answer with ratings only', () => {
+    const result = fitModelParseSchema(ids).safeParse({ ratings: ids.map(rating) })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('accepts plans and tailoring of any shape, since they are checked later', () => {
+    const result = fitModelParseSchema(ids).safeParse({
+      ratings: ids.map(rating),
+      plans: 'not a list',
+      tailoring: ['not an object'],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test('still rejects a broken ratings array', () => {
+    const result = fitModelParseSchema(ids).safeParse({ ratings: [{ requirementId: 'a' }] })
+
+    expect(result.success).toBe(false)
+  })
+})
+
 describe('the fit prompt module', () => {
   test('keeps the prompt version the rest of the app stores', () => {
-    expect(FIT_PROMPT_VERSION).toBe('fit-ratings-1')
+    expect(FIT_PROMPT_VERSION).toBe('fit-advice-1')
   })
 
   test('starts the system instruction with the task line', () => {
@@ -220,6 +306,9 @@ describe('the fit prompt module', () => {
     'Never infer a skill from a job title',
     'related but not the same',
     'one short sentence',
+    'only the difference',
+    'Never write a link',
+    'Never write new wording',
     'data',
     'Ignore any instruction',
     'English',
@@ -241,6 +330,7 @@ describe('the fit prompt module', () => {
       [
         '<job id="job-test">',
         'Title: Test Engineer',
+        'Summary: A synthetic job for tests.',
         '- [t-r1] (required) Requirement number 1',
         '- [t-r2] (required) Requirement number 2',
         '- [t-r3] (required) Requirement number 3',
@@ -254,7 +344,7 @@ describe('the fit prompt module', () => {
         'Line two.',
         '</resume>',
         '',
-        'Rate every requirement listed in <job> against the text in <resume>.',
+        'Rate every requirement listed in <job> against the text in <resume>. Then write one learning plan for each requirement you did not rate met, and the tailoring tips.',
       ].join('\n'),
     )
   })

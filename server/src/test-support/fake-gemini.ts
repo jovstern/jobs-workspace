@@ -20,6 +20,7 @@ export type Scenario =
   | 'garbage'
   | 'slow'
   | 'hallucinated_quote'
+  | 'advice_malformed'
 
 const SCENARIOS: readonly Scenario[] = [
   'ok',
@@ -30,6 +31,7 @@ const SCENARIOS: readonly Scenario[] = [
   'garbage',
   'slow',
   'hallucinated_quote',
+  'advice_malformed',
 ]
 
 const SLOW_DELAY_MS = 3000
@@ -242,6 +244,75 @@ function rateFromPrompt(prompt: PromptParts, hallucinate: boolean): FakeRating[]
   })
 }
 
+interface FakePlan {
+  requirementId: string
+  steps: string[]
+  whyItMatters: string
+  effort: 'days' | 'weeks' | 'months'
+}
+
+interface FakeAdvice {
+  plans: FakePlan[]
+  tailoring: { emphasise: { quote: string; advice: string }[]; keywords: string[] }
+}
+
+const MAX_FAKE_TIPS = 2
+const MAX_FAKE_KEYWORDS = 8
+
+// One learning plan for every requirement that was not rated met, and a little tailoring built from
+// the lines that were rated. Like the ratings it is rule-based, so tests can predict it. The texts
+// name the skill and nothing else: no links, no provider names, no numbers about the fit.
+function adviceFromRatings(prompt: PromptParts, ratings: readonly FakeRating[]): FakeAdvice {
+  const job = getJob(prompt.jobId)
+  const skillOf = (requirementId: string) =>
+    job?.requirements.find((requirement) => requirement.id === requirementId)?.skill
+
+  const plans: FakePlan[] = ratings.flatMap((rated): FakePlan[] => {
+    if (rated.rating === 'met') return []
+    const skill = skillOf(rated.requirementId)
+    if (skill === undefined) return []
+    const partial = rated.rating === 'partial'
+    const steps = partial
+      ? [`Read the official guide to ${skill}.`, `Build a small example that uses ${skill}.`]
+      : [
+          `Read the official guide to ${skill}.`,
+          `Follow a short course on ${skill}.`,
+          `Build a small example that uses ${skill}.`,
+        ]
+    return [
+      {
+        requirementId: rated.requirementId,
+        steps,
+        whyItMatters: `The role asks for ${skill}, and the resume does not yet show it.`,
+        effort: partial ? 'days' : 'weeks',
+      },
+    ]
+  })
+
+  const quotable = (rating: FakeRating['rating']) =>
+    ratings.flatMap((rated) =>
+      rated.rating === rating && rated.quote !== null && rated.quote !== HALLUCINATED_QUOTE
+        ? [rated.quote]
+        : [],
+    )
+  const quotes = [...new Set([...quotable('met'), ...quotable('partial')])].slice(0, MAX_FAKE_TIPS)
+  const keywords = ratings
+    .flatMap((rated) => (rated.rating === 'met' ? [] : [skillOf(rated.requirementId)]))
+    .flatMap((skill) => (skill === undefined ? [] : [skill]))
+    .slice(0, MAX_FAKE_KEYWORDS)
+
+  return {
+    plans,
+    tailoring: {
+      emphasise: quotes.map((quote) => ({
+        quote,
+        advice: 'Move this line higher, where a reader will see it first.',
+      })),
+      keywords,
+    },
+  }
+}
+
 function textResponse(text: string, finishReason: string): unknown {
   return {
     candidates: [{ content: { role: 'model', parts: [{ text }] }, finishReason }],
@@ -340,7 +411,8 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
         return
       }
       case 'ok':
-      case 'hallucinated_quote': {
+      case 'hallucinated_quote':
+      case 'advice_malformed': {
         const prompt = parsePrompt(body)
         if (prompt === null) {
           sendJson(response, 400, {
@@ -349,7 +421,12 @@ export async function startFakeGemini(options: { port?: number } = {}): Promise<
           return
         }
         const ratings = rateFromPrompt(prompt, scenario === 'hallucinated_quote')
-        sendJson(response, 200, textResponse(JSON.stringify({ ratings }), 'STOP'))
+        // The malformed scenario keeps the ratings of "ok" and breaks only the advice.
+        const answer =
+          scenario === 'advice_malformed'
+            ? { ratings, plans: 'not a list of plans', tailoring: ['not an object'] }
+            : { ratings, ...adviceFromRatings(prompt, ratings) }
+        sendJson(response, 200, textResponse(JSON.stringify(answer), 'STOP'))
         return
       }
     }

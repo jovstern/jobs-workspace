@@ -89,7 +89,7 @@ test('main flow: paste resume, remove contact details, check fit, refresh keeps 
     state: {
       byJobId: {
         'job-frontend-senior': {
-          advice: null,
+          advice: expect.objectContaining({ plans: expect.any(Array) }),
           resumeHash: expect.stringMatching(/^[0-9a-f]{64}$/),
         },
       },

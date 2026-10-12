@@ -97,7 +97,32 @@ test('returns one rating per requirement, in posting order, with verbatim quotes
     expect(rating.quote).not.toBeNull()
     expect(RESUME_A).toContain(rating.quote)
   }
-  expect(body.advice).toBeNull()
+  const gaps = body.ratings.filter((rating) => rating.rating !== 'met')
+  expect(gaps.length).toBeGreaterThan(0)
+  expect(body.advice?.plans.map((entry) => entry.requirementId)).toEqual(
+    gaps.map((rating) => rating.requirementId),
+  )
+  for (const entry of body.advice?.plans ?? []) {
+    expect([2, 3]).toContain(entry.steps.length)
+  }
+  expect(body.advice?.tailoring === null || typeof body.advice?.tailoring === 'object').toBe(true)
+  expect(fake.requestCount()).toBe(1)
+})
+
+test('malformed advice from the model costs nothing: the ratings stay, the advice is empty', async () => {
+  const baseline = fitResponseSchema.parse(
+    JSON.parse((await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })).text),
+  )
+  fake.reset()
+  fake.setScenario('advice_malformed')
+
+  const { status, text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+
+  expect(status).toBe(200)
+  const body = fitResponseSchema.parse(JSON.parse(text))
+  expect(body.ratings).toHaveLength(8)
+  expect(body.ratings).toEqual(baseline.ratings)
+  expect(body.advice).toEqual({ plans: [], tailoring: null })
   expect(fake.requestCount()).toBe(1)
 })
 
