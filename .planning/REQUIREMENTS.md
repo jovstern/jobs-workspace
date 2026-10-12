@@ -102,7 +102,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 ### Data and Privacy
 
 - [x] **DATA-01**: User's resume, applications, stages, analyses and chat history persist in the browser across refresh and restart
-- [ ] **DATA-02**: User's saved data survives app updates (versioned storage with migration), and corrupted storage is set aside with a visible message instead of crashing the page
+- [x] **DATA-02**: User's saved data survives app updates (versioned storage with migration), and corrupted storage is set aside with a visible message instead of crashing the page
 - [ ] **DATA-03**: User can export all their data to a file
 - [ ] **DATA-04**: User can import a previously exported file to restore their data
 - [ ] **DATA-05**: User can erase all their data, including the resume
@@ -232,7 +232,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | CHAT-04 | Phase 6 | Pending |
 | CHAT-05 | Phase 6 | Pending |
 | DATA-01 | Phase 1 | Complete |
-| DATA-02 | Phase 01.1 | Pending |
+| DATA-02 | Phase 01.1 | Complete |
 | DATA-03 | Phase 7 | Pending |
 | DATA-04 | Phase 7 | Pending |
 | DATA-05 | Phase 7 | Pending |

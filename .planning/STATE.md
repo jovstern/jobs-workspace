@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: "01.1"
 current_phase_name: Gaps, learning plan, tips and failure handling (INSERTED)
 status: executing
-stopped_at: Completed 01.1-03-PLAN.md
-last_updated: "2026-10-12T06:56:54.168Z"
+stopped_at: Completed 01.1-04-PLAN.md
+last_updated: "2026-10-12T11:14:24.563Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 01.1 execution started
-state_head: 42b99cc7ab10ee16bb3ad79a0e006b335c51284b
+state_head: 464bc68af4b39d29cf1062018016cb4ba94bb0f7
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 20
-  completed_plans: 15
+  completed_plans: 16
   percent: 11
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01.1 (Gaps, learning plan, tips and failure handling (INSERTED)) — EXECUTING
-Plan: 5 of 9
+Plan: 2 of 9
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 01.1 execution started
 
@@ -71,6 +71,7 @@ Progress: [█░░░░░░░░░] 11%
 | Phase 01.1 P09 | 3 min | 2 tasks | 7 files |
 | Phase 01.1 P02 | unrecorded | 3 tasks | 10 files |
 | Phase 01.1 P03 | 8min | 2 tasks | 9 files |
+| Phase 01.1 P04 | 8 min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,7 @@ Recent decisions affecting current work:
 - [Phase 01.1]: 01.1-02: notice Check again and Check my fit share one pending-focus ref; focus goes to the header Check again button, with no effect in FitPanel
 - [Phase 01.1]: 01.1-03: one surviving plan step keeps the plan; steps beyond four are cut, not the plan dropped
 - [Phase 01.1]: 01.1-03: link regex tightened for data: URLs; 12-name learning-platform deny-list kept as best-effort
+- [Phase 01.1]: 01.1-04: saved-data detection lives in a guarded PersistStorage getItem; set-aside copies keyed {store}:corrupt:{ISO}, 3 kept per store; persist versions stay 1
 
 ### Pending Todos
 
@@ -140,6 +142,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T06:56:54.133Z
-Stopped at: Completed 01.1-03-PLAN.md
+Last session: 2026-10-12T11:14:24.527Z
+Stopped at: Completed 01.1-04-PLAN.md
 Resume file: None
