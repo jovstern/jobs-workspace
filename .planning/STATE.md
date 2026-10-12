@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: "01.1"
 current_phase_name: Gaps, learning plan, tips and failure handling (INSERTED)
 status: executing
-stopped_at: Completed 01.1-06-PLAN.md
-last_updated: "2026-10-12T11:25:40.570Z"
+stopped_at: Completed 01.1-08-PLAN.md
+last_updated: "2026-10-12T11:35:30.417Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 01.1 execution started
-state_head: eed675428c5805474faaa4a27f5d97aff09330a9
+state_head: c6e6282d773ec411833cf4615f4615cc64f43446
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 20
-  completed_plans: 18
+  completed_plans: 19
   percent: 11
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01.1 (Gaps, learning plan, tips and failure handling (INSERTED)) — EXECUTING
-Plan: 4 of 9
+Plan: 5 of 9
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 01.1 execution started
 
@@ -74,6 +74,7 @@ Progress: [█░░░░░░░░░] 11%
 | Phase 01.1 P04 | 8 min | 3 tasks | 14 files |
 | Phase 01.1 P05 | 11 min | 3 tasks | 8 files |
 | Phase 01.1 P06 | 10 min | 2 tasks | 6 files |
+| Phase 01.1 P08 | n/a | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,7 @@ Recent decisions affecting current work:
 - [Phase 01.1]: 01.1-04: saved-data detection lives in a guarded PersistStorage getItem; set-aside copies keyed {store}:corrupt:{ISO}, 3 kept per store; persist versions stay 1
 - [Phase 01.1]: Plan 05: stand-in scenarios ship in each task's RED commit (test support the pre-commit typecheck needs); SCENARIOS is exported so the route test fails if a scenario is left unclassified
 - [Phase 01.1]: Plan 06: the whole TailoringSection, with every empty and unavailable state, was built in the tracer task; the second task added the state tests (checked by mutation) because the states share the same JSX
+- [Phase 01.1]: Plan 01.1-08: browser-only codes server_unreachable and request_timeout are a two-entry table in fit-errors.ts; the retry flag is always the envelope's, never derived from the code
 
 ### Pending Todos
 
@@ -146,6 +148,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T11:25:40.531Z
-Stopped at: Completed 01.1-06-PLAN.md
+Last session: 2026-10-12T11:35:30.379Z
+Stopped at: Completed 01.1-08-PLAN.md
 Resume file: None

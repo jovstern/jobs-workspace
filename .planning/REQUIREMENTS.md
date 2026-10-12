@@ -89,7 +89,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 - [x] **FIT-08**: User sees a previous analysis instantly when reopening a job, without another AI call
 - [ ] **FIT-09**: User sees the fit score on the result card of any job they have analysed
 - [ ] **FIT-10**: User whose resume has changed sees earlier analyses marked "resume changed, re-check?" and can re-run them
-- [ ] **FIT-11**: User sees progress while an analysis runs and a clear, retryable message when it fails, times out or the AI service is not configured
+- [x] **FIT-11**: User sees progress while an analysis runs and a clear, retryable message when it fails, times out or the AI service is not configured
 
 ### Job Chat
 
@@ -225,7 +225,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | FIT-08 | Phase 1 | Complete |
 | FIT-09 | Phase 2 | Pending |
 | FIT-10 | Phase 01.2 | Pending |
-| FIT-11 | Phase 01.1 | Pending |
+| FIT-11 | Phase 01.1 | Complete |
 | CHAT-01 | Phase 6 | Pending |
 | CHAT-02 | Phase 6 | Pending |
 | CHAT-03 | Phase 6 | Pending |
