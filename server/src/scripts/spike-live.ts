@@ -26,6 +26,7 @@ import { MODELS } from '../config/models'
 import type { ThinkingLevelName } from '../config/models'
 import { AppError } from '../http/errors'
 import { analyzeFit } from '../fit/analyze'
+import type { AdviceStats } from '../fit/advice'
 import { getJob } from '../jobs/seed'
 import {
   chooseThinkingLevel,
@@ -383,7 +384,83 @@ export async function runSpike(options: SpikeOptions): Promise<SpikeSummary> {
   }
 }
 
-export type SpikeMode = 'check-config' | 'dry-run' | 'live'
+// The advice checks (plan 01.1-07): a one-call smoke test and a short measurement.
+export const SMOKE_REQUEST_CAP = 1
+export const ADVICE_REQUEST_CAP = 10
+export const ADVICE_RUNS_PER_PAIR = 4
+
+export type AdviceCheckPlan = 'smoke' | 'advice'
+
+export interface AdviceCheckRow {
+  pair: PairName
+  ok: boolean
+  errorCode: string | null
+  failure: AiFailureDiagnostic | null
+  wallMs: number
+  usage: AiUsage | null
+  gaps: number | null
+  quoteRejected: number | null
+  advice: AdviceStats | null
+}
+
+export interface AdviceCheckSummary {
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  model: string
+  requestCap: number
+  requestsSent: number
+  stoppedEarly: boolean
+  rows: AdviceCheckRow[]
+  schemaAccepted: boolean | null
+  p50LatencyMs: number | null
+  p90LatencyMs: number | null
+  maxThoughtPlusOutputTokens: number | null
+  meanThoughtTokens: number | null
+  gapsWithoutPlan: number
+  tailoringUnusable: number
+  recommendedMaxOutputTokens: number | null
+  recommendedDeadlineMs: number | null
+  splitRecommended: boolean | null
+  estimatedSpendUsd: number | null
+}
+
+export interface AdviceCheckOptions {
+  ai: AiClient
+  resumeText: string
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  log?: (line: string) => void
+}
+
+export interface AdviceCheckFacts {
+  mode: 'dry-run' | 'live'
+  plan: AdviceCheckPlan
+  requestCap: number
+  stoppedEarly: boolean
+  rows: readonly AdviceCheckRow[]
+}
+
+export function schemaVerdict(rows: readonly AdviceCheckRow[]): boolean | null {
+  throw new Error(`not implemented: ${String(rows.length)} rows`)
+}
+
+export function recommendSettings(
+  maxThoughtPlusOutput: number,
+  p90LatencyMs: number,
+): { maxOutputTokens: number; deadlineMs: number } {
+  throw new Error(`not implemented: ${String(maxThoughtPlusOutput + p90LatencyMs)}`)
+}
+
+export function summariseAdviceCheck(facts: AdviceCheckFacts): AdviceCheckSummary {
+  throw new Error(`not implemented: ${facts.plan}`)
+}
+
+export function runAdviceCheck(options: AdviceCheckOptions): Promise<AdviceCheckSummary> {
+  return Promise.reject(new Error(`not implemented: ${options.plan}`))
+}
+
+export type SpikeMode =
+  'check-config' | 'dry-run' | 'live' | 'smoke' | 'advice' | 'dry-run-smoke' | 'dry-run-advice'
 
 export const USAGE = [
   'usage: npm --prefix server run spike:live -- <option>',
@@ -465,6 +542,12 @@ async function main(): Promise<void> {
 
   if (mode === 'check-config') {
     console.log(configLine(env))
+    return
+  }
+
+  if (mode !== 'live') {
+    console.error(USAGE)
+    process.exitCode = 2
     return
   }
 
