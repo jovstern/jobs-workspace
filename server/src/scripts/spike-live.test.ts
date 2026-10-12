@@ -95,7 +95,7 @@ describe('runSpike against the stand-in model', () => {
     expect(summary.requestsSent).toBe(3)
     expect(fake.requestCount()).toBe(3)
     expect(summary.stoppedEarly).toBe(true)
-    expect(summary.rows.every((row) => !row.ok && row.errorCode === 'ai_failed')).toBe(true)
+    expect(summary.rows.every((row) => !row.ok && row.errorCode === 'ai_overloaded')).toBe(true)
     expect(summary.chosenLevel).toBeNull()
     expect(summary.recommendedMaxOutputTokens).toBeNull()
     expect(summary.recommendedDeadlineMs).toBeNull()

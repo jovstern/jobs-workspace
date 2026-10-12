@@ -55,16 +55,19 @@ describe('failure diagnostics', () => {
   })
 
   test.each([
-    ['http_429', { httpStatus: 429, category: 'RESOURCE_EXHAUSTED' }],
-    ['http_503', { httpStatus: 503, category: 'UNAVAILABLE' }],
-    ['blocked', { httpStatus: null, category: 'blocked' }],
-    ['truncated', { httpStatus: null, category: 'unfinished' }],
-    ['garbage', { httpStatus: null, category: 'invalid_json' }],
-  ] as const)('the %s scenario reports %j', async (scenario, expected) => {
+    ['http_429', { httpStatus: 429, category: 'RESOURCE_EXHAUSTED' }, 'ai_rate_limited'],
+    ['http_503', { httpStatus: 503, category: 'UNAVAILABLE' }, 'ai_overloaded'],
+    ['blocked', { httpStatus: null, category: 'blocked' }, 'ai_blocked'],
+    ['truncated', { httpStatus: null, category: 'unfinished' }, 'ai_truncated'],
+    ['garbage', { httpStatus: null, category: 'invalid_json' }, 'ai_invalid_output'],
+  ] as const)('the %s scenario reports %j and throws %s', async (scenario, expected, code) => {
     fake.setScenario(scenario)
     const seen: AiFailureDiagnostic[] = []
-    await callWith((d) => seen.push(d))
+    const outcome = await callWith((d) => seen.push(d))
     expect(seen).toMatchObject([expected])
+    expect(outcome.ok).toBe(false)
+    if (outcome.ok) return
+    expect(outcome.error).toMatchObject({ name: 'AppError', code })
   })
 
   test('the diagnostic never holds the provider message', async () => {

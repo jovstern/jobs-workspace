@@ -1,7 +1,7 @@
 import type { Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 
-import { apiErrorSchema, fitResponseSchema } from '@jobs-workspace/shared'
+import { apiErrorSchema, ERROR_MESSAGES, fitResponseSchema } from '@jobs-workspace/shared'
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'vitest'
 import { z } from 'zod'
 
@@ -211,20 +211,70 @@ describe('requests that must never reach the model', () => {
 })
 
 describe('model and upstream failures', () => {
-  test.each(['http_503', 'http_429', 'blocked', 'truncated', 'garbage'] as const)(
-    '%s answers 502 ai_failed after exactly one upstream request',
-    async (scenario) => {
+  // The code, status and retry flag each failing stand-in scenario must leave the route with.
+  test.each([
+    ['http_429', 429, 'ai_rate_limited', true],
+    ['http_503', 502, 'ai_overloaded', true],
+    ['blocked', 422, 'ai_blocked', false],
+    ['truncated', 502, 'ai_truncated', true],
+    ['garbage', 502, 'ai_invalid_output', true],
+  ] as const)(
+    '%s answers %i %s after exactly one upstream request',
+    async (scenario, expectedStatus, expectedCode, expectedRetryable) => {
       fake.setScenario(scenario)
 
       const { status, text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
 
-      expect(status).toBe(502)
+      expect(status).toBe(expectedStatus)
       const body = apiErrorSchema.parse(JSON.parse(text))
-      expect(body.error.code).toBe('ai_failed')
-      expect(body.error.retryable).toBe(true)
+      expect(body.error.code).toBe(expectedCode)
+      expect(body.error.retryable).toBe(expectedRetryable)
+      expect(body.error.message).toBe(ERROR_MESSAGES[expectedCode])
       expect(fake.requestCount()).toBe(1)
     },
   )
+
+  test("a key Google is rate limiting gets Google's own sentence", async () => {
+    fake.setScenario('http_429')
+
+    const { text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+
+    expect(JSON.parse(text)).toMatchObject({
+      error: {
+        code: 'ai_rate_limited',
+        retryable: true,
+        message:
+          "Google's AI is rate limiting this key. Wait a while, then try again. If it keeps happening, a daily quota may be used up: check your usage in Google AI Studio.",
+      },
+    })
+  })
+
+  test("no error body holds the provider's own wording", async () => {
+    for (const scenario of ['http_429', 'http_503', 'blocked', 'truncated', 'garbage'] as const) {
+      fake.setScenario(scenario)
+      const { text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
+      for (const providerText of [
+        'Quota exceeded',
+        'The model is overloaded',
+        'PROHIBITED_CONTENT',
+      ]) {
+        expect(text).not.toContain(providerText)
+      }
+    }
+  })
+
+  test('a 400 the stand-in does not recognise still leaves as ai_failed', async () => {
+    // The unrecognised-prompt 400 is what the stand-in answers to a request that is not a fit prompt.
+    await expect(
+      ai.generateJson({
+        task: 'fit',
+        system: 'not a fit prompt',
+        userText: 'unused',
+        schema: z.object({}),
+        signal: new AbortController().signal,
+      }),
+    ).rejects.toMatchObject({ code: 'ai_failed' })
+  })
 })
 
 test('a missed deadline rejects with ai_failed', async () => {

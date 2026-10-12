@@ -202,21 +202,21 @@ describe('a failed model call', () => {
   }
 
   test.each([
-    ['http_429', 'fit failed status=429 category=RESOURCE_EXHAUSTED'],
-    ['http_503', 'fit failed status=503 category=UNAVAILABLE'],
-    ['blocked', 'fit failed status=none category=blocked'],
-    ['truncated', 'fit failed status=none category=unfinished'],
-    ['garbage', 'fit failed status=none category=invalid_json'],
+    ['http_429', 429, 'ai_rate_limited', 'fit failed status=429 category=RESOURCE_EXHAUSTED'],
+    ['http_503', 502, 'ai_overloaded', 'fit failed status=503 category=UNAVAILABLE'],
+    ['blocked', 422, 'ai_blocked', 'fit failed status=none category=blocked'],
+    ['truncated', 502, 'ai_truncated', 'fit failed status=none category=unfinished'],
+    ['garbage', 502, 'ai_invalid_output', 'fit failed status=none category=invalid_json'],
   ] as const)(
     '%s writes one status-and-category line, then the request line',
-    async (scenario, expected) => {
+    async (scenario, expectedStatus, expectedCode, expected) => {
       const { status, text } = await postFailing(scenario)
 
-      expect(status).toBe(502)
-      expect(JSON.parse(text)).toMatchObject({ error: { code: 'ai_failed', retryable: true } })
+      expect(status).toBe(expectedStatus)
+      expect(JSON.parse(text)).toMatchObject({ error: { code: expectedCode } })
       expect(lines).toHaveLength(2)
       expect(lines[0]).toBe(expected)
-      expect(lines[1]).toMatch(/^POST \/api\/fit 502 \d+ms$/)
+      expect(lines[1]).toMatch(new RegExp(`^POST /api/fit ${String(expectedStatus)} \\d+ms$`))
     },
   )
 
