@@ -22,6 +22,12 @@ async function saveResume(page: Page) {
   await expect(page.getByText('Resume saved.', { exact: true })).toBeAttached()
 }
 
+// The demo test is also the pull request's recording. The stand-in model answers at once, so
+// without these the recording is over before anyone can read it.
+async function holdForRecording(page: Page, ms = 2000) {
+  await page.waitForTimeout(ms)
+}
+
 test('main flow: paste resume, remove contact details, check fit, refresh keeps both', async ({
   page,
 }) => {
@@ -367,21 +373,33 @@ test.describe('with the stand-in model', () => {
     await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
     await page.getByRole('button', { name: 'Check my fit' }).click()
 
-    await expect(page.getByRole('heading', { level: 4, name: 'Required gaps (6)' })).toBeVisible()
+    const requiredGaps = page.getByRole('heading', { level: 4, name: 'Required gaps (6)' })
+    await expect(requiredGaps).toBeVisible()
     await expect(
       page.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (2)' }),
     ).toBeVisible()
     await expect(page.getByText('What to learn').first()).toBeVisible()
     await expect(page.getByText(/^Rough effort: (days|weeks|months)$/).first()).toBeVisible()
+    await requiredGaps.evaluate((heading) => {
+      heading.scrollIntoView({ block: 'start' })
+    })
+    await holdForRecording(page, 3000)
     await page
       .getByRole('button', { name: /^Show plan:/ })
       .first()
       .click()
     await expect(page.getByRole('button', { name: /^Hide plan:/ })).toHaveCount(1)
-    await expect(
-      page.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
-    ).toBeVisible()
+    await holdForRecording(page)
+    const tailoring = page.getByRole('heading', {
+      level: 3,
+      name: 'Tailoring your resume for this job',
+    })
+    await expect(tailoring).toBeVisible()
     await expect(page.getByText('Add only if true for you.', { exact: true })).toBeVisible()
+    await tailoring.evaluate((heading) => {
+      heading.scrollIntoView({ block: 'start' })
+    })
+    await holdForRecording(page, 3000)
 
     // 2. The AI is rate limited: the page says so, and one click recovers.
     await request.post(`${STAND_IN}/__scenario`, { data: { name: 'http_429' } })
@@ -390,10 +408,14 @@ test.describe('with the stand-in model', () => {
 
     const alert = page.getByRole('alert')
     await expect(alert).toContainText("Google's AI is rate limiting this key.")
+    await alert.scrollIntoViewIfNeeded()
+    await holdForRecording(page, 3000)
     await request.post(`${STAND_IN}/__scenario`, { data: { name: 'ok' } })
     await alert.getByRole('button', { name: 'Try again' }).click()
     await expect(page.getByText(BANDS)).toBeVisible()
     await expect(alert).toHaveCount(0)
+    await page.getByText(BANDS).scrollIntoViewIfNeeded()
+    await holdForRecording(page)
 
     // 3. Saved fit checks that cannot be read are set aside, with a notice above a working page.
     await page.evaluate(() => {
@@ -409,10 +431,12 @@ test.describe('with the stand-in model', () => {
     const headingBox = await page.getByRole('heading', { level: 1 }).boundingBox()
     expect(alertBox?.y ?? Infinity).toBeLessThan(headingBox?.y ?? 0)
     await expect(page.getByText(/^Resume saved\. \d+ characters\.$/)).toBeVisible()
+    await holdForRecording(page, 3000)
 
     await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
     await expect(page.getByRole('button', { name: 'Check my fit' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 4, name: /^Required gaps/ })).toHaveCount(0)
+    await holdForRecording(page)
   })
 })
 
