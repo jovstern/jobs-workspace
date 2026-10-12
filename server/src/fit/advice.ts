@@ -2,13 +2,28 @@ import {
   adviceSchema,
   EFFORTS,
   indexRatingsFirstWins,
+  KEYWORD_MAX_CHARS,
+  KEYWORD_MIN_CHARS,
+  KEYWORDS_MAX,
   PLAN_STEP_MAX_CHARS,
   PLAN_STEPS_MAX,
   PLAN_WHY_MAX_CHARS,
+  TIP_ADVICE_MAX_CHARS,
+  TIP_QUOTE_MAX_CHARS,
+  TIPS_MAX,
 } from '@jobs-workspace/shared'
-import type { Advice, Effort, Job, LearningPlan, RatedRequirement } from '@jobs-workspace/shared'
+import type {
+  Advice,
+  Effort,
+  EmphasiseTip,
+  Job,
+  LearningPlan,
+  RatedRequirement,
+  Tailoring,
+} from '@jobs-workspace/shared'
 
-import { containsLink, namesLearningPlatform } from './advice-text'
+import { containsLink, keywordIsMissing, namesLearningPlatform, postingTextOf } from './advice-text'
+import { normaliseForMatch, verifyQuote } from './quotes'
 import type { ResumeIndex } from './quotes'
 
 export interface BuildAdviceInput {
@@ -123,18 +138,90 @@ function keepPlans(input: BuildAdviceInput, stats: AdviceStats): LearningPlan[] 
   })
 }
 
+// How many words a keyword may have: a skill or a tool name, not a sentence.
+const KEYWORD_MAX_WORDS = 4
+
+// The tips worth keeping. A tip is kept only when its quote really is in the resume that was sent
+// (checked with the same verifyQuote as rating quotes) and its advice is short, plain text with no
+// link and no learning-platform name. Nothing is repaired: a tip that fails is dropped whole, so a
+// tip is never returned without its verified quote. The first TIPS_MAX survivors are kept.
+function keepTips(rawTips: unknown, index: ResumeIndex, stats: AdviceStats): EmphasiseTip[] {
+  if (!Array.isArray(rawTips)) return []
+  stats.tipsReceived = rawTips.length
+
+  const tips: EmphasiseTip[] = []
+  const seen = new Set<string>()
+  for (const raw of rawTips as unknown[]) {
+    if (tips.length >= TIPS_MAX) break
+    if (!isRecord(raw) || typeof raw.quote !== 'string') continue
+    const quote = raw.quote.trim()
+    if (quote === '' || quote.length > TIP_QUOTE_MAX_CHARS || !verifyQuote(quote, index)) continue
+    const advice = usableText(raw.advice, TIP_ADVICE_MAX_CHARS)
+    const key = normaliseForMatch(quote)
+    if (advice === null || seen.has(key)) continue
+    seen.add(key)
+    tips.push({ quote, advice })
+  }
+  stats.tipsKept = tips.length
+  return tips
+}
+
+// The keywords worth keeping: words from the posting that the resume does not use, as the model
+// wrote them apart from trimming. The first KEYWORDS_MAX survivors are kept.
+function keepKeywords(rawKeywords: unknown, input: BuildAdviceInput, stats: AdviceStats): string[] {
+  if (!Array.isArray(rawKeywords)) return []
+  stats.keywordsReceived = rawKeywords.length
+
+  const posting = postingTextOf(input.job)
+  const keywords: string[] = []
+  const seen = new Set<string>()
+  for (const raw of rawKeywords as unknown[]) {
+    if (keywords.length >= KEYWORDS_MAX) break
+    if (typeof raw !== 'string') continue
+    const keyword = raw.trim()
+    if (keyword.length < KEYWORD_MIN_CHARS || keyword.length > KEYWORD_MAX_CHARS) continue
+    if (keyword.split(/\s+/).length > KEYWORD_MAX_WORDS || containsLink(keyword)) continue
+    const key = normaliseForMatch(keyword)
+    if (seen.has(key) || !keywordIsMissing(keyword, posting, input.index)) continue
+    seen.add(key)
+    keywords.push(keyword)
+  }
+  stats.keywordsKept = keywords.length
+  return keywords
+}
+
+// The tailoring part of the answer, or null when the model did not give an object. An object whose
+// items are all dropped is still usable: it gives empty lists.
+function keepTailoring(input: BuildAdviceInput, stats: AdviceStats): Tailoring | null {
+  const { rawTailoring } = input
+  if (!isRecord(rawTailoring)) return null
+  stats.tailoringUsable = true
+  return {
+    emphasise: keepTips(rawTailoring.emphasise, input.index, stats),
+    keywords: keepKeywords(rawTailoring.keywords, input, stats),
+  }
+}
+
 // Turns what the model said about advice into advice the shared schema accepts. It cannot throw
 // and cannot fail the response: anything unusable becomes "no plans" and "no tailoring", so a
-// defect in advice never costs the user the ratings. Tailoring is always null for now; a tip that
-// has not been checked against the resume must never reach the user. Nothing is logged here.
+// defect in advice never costs the user the ratings. Every plan step, tip and keyword is checked
+// in code before it is returned, and nothing is repaired. Nothing is logged here.
 export function buildAdvice(input: BuildAdviceInput): { advice: Advice; stats: AdviceStats } {
   const stats = emptyStats()
   try {
     const plans = keepPlans(input, stats)
-    const checked = adviceSchema.safeParse({ plans, tailoring: null })
+    const tailoring = keepTailoring(input, stats)
+    const checked = adviceSchema.safeParse({ plans, tailoring })
     if (checked.success) return { advice: checked.data, stats }
   } catch {
     // Falls through to the empty advice below.
   }
-  return { advice: EMPTY_ADVICE, stats: { ...stats, plansKept: 0 } }
+  return {
+    advice: EMPTY_ADVICE,
+    stats: {
+      ...emptyStats(),
+      plansReceived: stats.plansReceived,
+      tipsReceived: stats.tipsReceived,
+    },
+  }
 }

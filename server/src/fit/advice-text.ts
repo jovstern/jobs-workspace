@@ -1,5 +1,6 @@
 import type { Job } from '@jobs-workspace/shared'
 
+import { normaliseForMatch, occursAsPhrase } from './quotes'
 import type { ResumeIndex } from './quotes'
 
 // Text checks for model advice. Pure and total: they never throw and never log. Model text is
@@ -64,14 +65,70 @@ export function namesLearningPlatform(text: string): boolean {
   return PLATFORM_PATTERN.test(text)
 }
 
+// The text of a posting as the user can read it on the page: the title, the summary paragraphs and
+// every requirement text. It is seed content, so it is trusted.
 export function postingTextOf(job: Job): string {
-  return job.title.length < 0 ? '' : ''
+  return [
+    job.title,
+    ...job.summary,
+    ...job.requirements.map((requirement) => requirement.text),
+  ].join('\n')
 }
 
+const TRAILING_JS = /\.js$/
+
+function words(text: string): string[] {
+  return text.split(' ').filter((word) => word !== '')
+}
+
+// "react/redux" read as two words, and "node.js" read as "node", so a resume that writes "Node" or
+// "React/Redux" counts as using those words. Input is in normaliseForMatch form.
+function foldText(normalised: string): string {
+  return words(normalised.replaceAll('/', ' '))
+    .map((word) => word.replace(TRAILING_JS, ''))
+    .join(' ')
+}
+
+// The last word's plural toggled: a final "s" removed, or added when absent.
+function withTogglePlural(phrase: string): string {
+  const parts = words(phrase)
+  const last = parts.pop()
+  if (last === undefined) return phrase
+  parts.push(last.endsWith('s') ? last.slice(0, -1) : `${last}s`)
+  return parts.join(' ')
+}
+
+function keywordForms(keyword: string): string[] {
+  const base = [keyword, words(keyword.replaceAll('/', ' ')).join(' ')]
+  const withoutJs = base.map((form) => {
+    const parts = words(form)
+    const last = parts.pop()
+    return last === undefined ? form : [...parts, last.replace(TRAILING_JS, '')].join(' ')
+  })
+  const forms = [...base, ...withoutJs].filter((form) => form !== '')
+  return [...new Set([...forms, ...forms.map(withTogglePlural)])].filter((form) => form !== '')
+}
+
+// True when the keyword is a good one to suggest: it occurs in the posting and the resume does not
+// already use it. Case, a slash, a trailing ".js", a plural "s" and a hyphen at a line end are
+// folded; there is no stemming beyond that and no synonyms, and both ways of being wrong are safe (a
+// keyword wrongly kept is shown with a fixed note, one wrongly dropped is simply not shown).
+//
+// Because a keyword must occur in the posting, which is trusted seed text, text in an untrusted
+// resume cannot place an arbitrary word in the keyword list.
 export function keywordIsMissing(
   keyword: string,
   postingText: string,
   resume: ResumeIndex,
 ): boolean {
-  return keyword.length < 0 && postingText.length < 0 && resume.joined.length < 0
+  const forms = keywordForms(normaliseForMatch(keyword))
+  if (forms.length === 0) return false
+
+  const posting = normaliseForMatch(postingText)
+  const postingForms = [posting, foldText(posting)]
+  const resumeForms = [resume.joined, resume.separated].flatMap((text) => [text, foldText(text)])
+
+  const occursIn = (texts: readonly string[]) =>
+    forms.some((form) => texts.some((text) => occursAsPhrase(text, form)))
+  return occursIn(postingForms) && !occursIn(resumeForms)
 }
