@@ -337,6 +337,83 @@ test.describe('with the stand-in model', () => {
     await expect(page.getByRole('button', { name: 'Check again', exact: true })).toBeFocused()
     expect(fitRequests).toBe(2)
   })
+
+  test('progress is shown while a slow check runs, then the result @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'slow' } })
+
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    await expect(page.getByText('Checking your fit', { exact: true })).toBeVisible()
+    await expect(page.getByText('Reading your resume', { exact: true })).toBeVisible()
+    await expect(page.getByText(/^Usually \d+ to \d+ seconds\.$/)).toBeVisible()
+    await expect(page.getByRole('progressbar', { name: 'Checking your fit' })).toBeVisible()
+
+    await expect(page.getByText(BANDS)).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByRole('progressbar')).toHaveCount(0)
+  })
+
+  test('demo: gaps with learning plans and tips, a failed check recovered with Try again, and a storage notice above a working page @fake-only', async ({
+    page,
+    request,
+  }) => {
+    await saveResume(page)
+
+    // 1. A check that leaves a next step: gaps, what to learn, and how to tailor the resume.
+    await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    await expect(page.getByRole('heading', { level: 4, name: 'Required gaps (6)' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (2)' }),
+    ).toBeVisible()
+    await expect(page.getByText('What to learn').first()).toBeVisible()
+    await expect(page.getByText(/^Rough effort: (days|weeks|months)$/).first()).toBeVisible()
+    await page
+      .getByRole('button', { name: /^Show plan:/ })
+      .first()
+      .click()
+    await expect(page.getByRole('button', { name: /^Hide plan:/ })).toHaveCount(1)
+    await expect(
+      page.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+    ).toBeVisible()
+    await expect(page.getByText('Add only if true for you.', { exact: true })).toBeVisible()
+
+    // 2. The AI is rate limited: the page says so, and one click recovers.
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'http_429' } })
+    await page.getByRole('button', { name: 'Junior Frontend Developer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+
+    const alert = page.getByRole('alert')
+    await expect(alert).toContainText("Google's AI is rate limiting this key.")
+    await request.post(`${STAND_IN}/__scenario`, { data: { name: 'ok' } })
+    await alert.getByRole('button', { name: 'Try again' }).click()
+    await expect(page.getByText(BANDS)).toBeVisible()
+    await expect(alert).toHaveCount(0)
+
+    // 3. Saved fit checks that cannot be read are set aside, with a notice above a working page.
+    await page.evaluate(() => {
+      window.localStorage.setItem('jw:analyses', '{broken')
+    })
+    await page.reload()
+
+    const storageAlert = page.getByRole('alert')
+    await expect(storageAlert).toContainText(
+      'Your saved fit checks could not be read, so they were set aside.',
+    )
+    const alertBox = await storageAlert.boundingBox()
+    const headingBox = await page.getByRole('heading', { level: 1 }).boundingBox()
+    expect(alertBox?.y ?? Infinity).toBeLessThan(headingBox?.y ?? 0)
+    await expect(page.getByText(/^Resume saved\. \d+ characters\.$/)).toBeVisible()
+
+    await page.getByRole('button', { name: 'Senior Data Scientist' }).click()
+    await expect(page.getByRole('button', { name: 'Check my fit' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 4, name: /^Required gaps/ })).toHaveCount(0)
+  })
 })
 
 test('a paste that is too short is refused and saves nothing, even after a reload', async ({

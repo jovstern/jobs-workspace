@@ -6,6 +6,7 @@ import type { Mock } from 'vitest'
 
 import { renderWithQuery } from '../../test/render'
 import { FitPanel } from './FitPanel'
+import { FIT_REASSURANCE } from './progress-lines'
 import { useFitStore } from './fit-store'
 
 const HASH = 'a'.repeat(64)
@@ -200,9 +201,6 @@ test('a click sends one POST and, while it runs, shows progress and ignores a se
     expect(button).toHaveAttribute('aria-disabled', 'true')
   })
   expect(button).toHaveTextContent('Check my fit')
-  const status = screen.getByRole('status')
-  expect(status).toHaveTextContent('Checking your fit')
-  expect(status).toHaveTextContent('Usually 10 to 20 seconds.')
   const bar = screen.getByRole('progressbar', { name: 'Checking your fit' })
   expect(bar).not.toHaveAttribute('aria-valuenow')
 
@@ -219,6 +217,52 @@ test('a click sends one POST and, while it runs, shows progress and ignores a se
 
   finish(jsonResponse(fitResponse(FIVE_MET_ONE_PARTIAL)))
   expect(await screen.findByRole('button', { name: 'Check again' })).toBeInTheDocument()
+})
+
+test('while a check runs the status region holds only the stage line, the rest sits outside it', async () => {
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  const heading = await screen.findByText('Checking your fit', { selector: 'p' })
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Reading your resume')
+  expect(status).not.toContainElement(heading)
+  const reassurance = screen.getByText(FIT_REASSURANCE)
+  expect(status).not.toContainElement(reassurance)
+  expect(screen.getByRole('progressbar', { name: 'Checking your fit' })).toBeInTheDocument()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+})
+
+test('while a check runs the result, the old-result notice and the error notice are absent', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  await screen.findByRole('progressbar', { name: 'Checking your fit' })
+  expect(screen.queryByText('83%')).not.toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  const action = screen.getByRole('button', { name: 'Check again' })
+  expect(action).toHaveAttribute('aria-disabled', 'true')
+  expect(action).toHaveTextContent('Check again')
+})
+
+test('after a failed check the status region is empty and the alert shows', async () => {
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  expect(await screen.findByRole('alert')).toBeInTheDocument()
+  expect(screen.getByRole('status').textContent).toBe('')
 })
 
 test('a finished check shows the score block, announces it, and moves focus to Check again', async () => {
