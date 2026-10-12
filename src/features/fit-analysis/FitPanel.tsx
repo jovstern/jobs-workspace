@@ -1,10 +1,11 @@
 import type { Job } from '@jobs-workspace/shared'
 import { Progress } from 'radix-ui'
-import { useId, useState } from 'react'
+import { useId, useRef } from 'react'
 
 import { Button } from '../../components/Button'
 import { Notice } from '../../components/Notice'
 import { ApiError } from '../../lib/api'
+import { AdviceMissingNotice } from './AdviceMissingNotice'
 import { useFitStore } from './fit-store'
 import { useCheckFit, useIsCheckingFit } from './mutations'
 import { GapsSection } from './GapsSection'
@@ -25,11 +26,6 @@ const GENERIC_ERROR = 'Something went wrong on our side. Try again.'
 const NOT_CONFIGURED_ERROR =
   'AI is not set up. Add GEMINI_API_KEY to server/.env and restart the server.'
 
-// Runs once when the element is added to the page; the identity is stable so it never re-runs.
-function focusOnMount(element: HTMLElement | null) {
-  element?.focus()
-}
-
 // The fit region of the job detail. A check starts only from a click handler here: never on
 // render, selection, refresh, focus, a timer or a reconnect. The result is derived in render from
 // the stored ratings; nothing about the score is kept in state.
@@ -38,7 +34,10 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
   const byJobId = useFitStore((state) => state.byJobId)
   const checkFit = useCheckFit()
   const isChecking = useIsCheckingFit(job.id)
-  const [focusRerun, setFocusRerun] = useState(false)
+  // The header Check again button, and whether focus should go to it as soon as it exists. Both
+  // are read and written only in event handlers and the ref callback, never during render.
+  const actionButton = useRef<HTMLButtonElement | null>(null)
+  const focusWhenShown = useRef(false)
 
   const analysis = selectCurrentAnalysis(byJobId, job, resume?.textHash ?? null)
   const view = analysis ? buildFitView(job, analysis) : null
@@ -49,9 +48,22 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
   const failure = checkFit.isError ? checkFit.error : null
   const notConfigured = failure instanceof ApiError && failure.code === 'ai_not_configured'
 
-  function startCheck(fromPrimary: boolean) {
+  function setActionButton(element: HTMLButtonElement | null) {
+    actionButton.current = element
+    if (element !== null && focusWhenShown.current) {
+      focusWhenShown.current = false
+      element.focus()
+    }
+  }
+
+  // moveFocus: the control used will go away (Check my fit, or the old-result notice), so focus
+  // moves to the header button, now if it exists or as soon as the result shows it.
+  function startCheck(moveFocus: boolean) {
     if (isUnavailable || resume === null) return
-    if (fromPrimary) setFocusRerun(true)
+    if (moveFocus) {
+      if (actionButton.current !== null) actionButton.current.focus()
+      else focusWhenShown.current = true
+    }
     checkFit.mutate({ jobId: job.id, resumeText: resume.text, resumeHash: resume.textHash })
   }
 
@@ -76,7 +88,7 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
             variant="secondary"
             aria-disabled={isUnavailable}
             aria-describedby={reason !== undefined ? reasonId : undefined}
-            ref={focusRerun ? focusOnMount : undefined}
+            ref={setActionButton}
             onClick={() => {
               startCheck(false)
             }}
@@ -139,7 +151,22 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
           </div>
           {analysis ? (
             <div className="mt-12">
-              <GapsSection key={analysis.analysedAt} gaps={view.gaps} hasAdvice={view.hasAdvice} />
+              <GapsSection
+                key={analysis.analysedAt}
+                gaps={view.gaps}
+                hasAdvice={view.hasAdvice}
+                notice={
+                  view.hasAdvice ? null : (
+                    <AdviceMissingNotice
+                      onCheckAgain={() => {
+                        startCheck(true)
+                      }}
+                      unavailable={isUnavailable}
+                      describedBy={reason !== undefined ? reasonId : undefined}
+                    />
+                  )
+                }
+              />
             </div>
           ) : null}
         </>
