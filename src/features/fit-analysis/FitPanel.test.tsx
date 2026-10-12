@@ -110,6 +110,11 @@ function at<T>(items: readonly T[], index: number): T {
   return found
 }
 
+// The panel's own announcement region is the first status in the page; a notice may add another.
+function liveRegion() {
+  return at(screen.getAllByRole('status'), 0)
+}
+
 function answerWith(response: FitResponse) {
   fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(response)))
 }
@@ -233,9 +238,7 @@ test('a finished check shows the score block, announces it, and moves focus to C
   expect(screen.getByText('5 of 6 required requirements met')).toBeInTheDocument()
   expect(screen.getByText(DISCLAIMER)).toBeInTheDocument()
   expect(screen.getByText('Checked 11 Oct 2026. Saved in this browser.')).toBeInTheDocument()
-  expect(screen.getByRole('status')).toHaveTextContent(
-    'Fit check complete. Fit estimate 83%, Strong fit.',
-  )
+  expect(liveRegion()).toHaveTextContent('Fit check complete. Fit estimate 83%, Strong fit.')
   expect(useFitStore.getState().byJobId[JOB.id]?.resumeHash).toBe(HASH)
 })
 
@@ -351,7 +354,7 @@ test('a stored result is shown at once and sends no request', () => {
 
   expect(screen.getByText('83%')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Check again' })).toBeInTheDocument()
-  expect(screen.queryByRole('status')).toHaveTextContent('')
+  expect(liveRegion()).toHaveTextContent('')
   expect(fetchMock).not.toHaveBeenCalled()
 })
 
@@ -440,4 +443,161 @@ test('a stored result with learning plans shows the Gaps section after the Requi
     screen.getByRole('heading', { level: 4, name: 'Nice-to-have gaps (1)' }),
   ).toBeInTheDocument()
   expect(screen.getByText('Read the state management guide')).toBeInTheDocument()
+})
+
+const OLD_RESULT_SENTENCE =
+  'Learning plans and tailoring tips are new. Check again to add them to this result.'
+const NOTICE_BUTTON = 'Check again to add learning plans and tips'
+const R6_ADVICE: Advice = {
+  plans: [
+    {
+      requirementId: 'r6',
+      steps: ['Read the state management guide'],
+      whyItMatters: 'Because r6.',
+      effort: 'days',
+    },
+  ],
+  tailoring: null,
+}
+
+test('a result saved before learning plans existed offers Check again under the Gaps heading', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  const notice = screen
+    .getAllByRole('status')
+    .find((region) => region.textContent.includes(OLD_RESULT_SENTENCE))
+  if (notice === undefined) throw new Error('The old-result notice is missing')
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  const groups = screen.getByRole('heading', { level: 4, name: 'Required gaps (1)' })
+  expect(gaps.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(notice.compareDocumentPosition(groups) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  const button = within(notice).getByRole('button', { name: NOTICE_BUTTON })
+  expect(button).toHaveTextContent('Check again')
+  expect(button).not.toHaveAttribute('aria-disabled', 'true')
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('an old result shows its gaps with no plan area and no missing-plan line', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByText('partly evidenced in your resume')).toBeInTheDocument()
+  expect(screen.queryByText('What to learn')).not.toBeInTheDocument()
+  expect(screen.queryByText(/No learning plan was generated/)).not.toBeInTheDocument()
+})
+
+test('a result that has learning plans shows no old-result notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  renderPanel()
+
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: NOTICE_BUTTON })).not.toBeInTheDocument()
+})
+
+test('the notice button sends one request, adds the plans, keeps the score and removes the notice', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(screen.getByText('83%')).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  const [url, init] = at(fetchMock.mock.calls, 0)
+  expect(url).toBe('/api/fit')
+  expect(JSON.parse(typeof init?.body === 'string' ? init.body : '')).toEqual({
+    jobId: JOB.id,
+    resumeText: RESUME.text,
+  })
+  expect(screen.getByText('83%')).toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: NOTICE_BUTTON })).not.toBeInTheDocument()
+})
+
+test('focus moves to the header Check again button when the notice button is used', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  let finish: (response: Response) => void = () => undefined
+  fetchMock.mockImplementation(
+    () =>
+      new Promise<Response>((resolve) => {
+        finish = resolve
+      }),
+  )
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  // While the check runs the notice is hidden, and focus has not fallen back to the page.
+  const header = screen.getByRole('button', { name: 'Check again' })
+  expect(header).toHaveFocus()
+  expect(header).toHaveAttribute('aria-disabled', 'true')
+
+  finish(jsonResponse(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE)))
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Check again' })).toHaveFocus()
+})
+
+test('the header Check again button also adds the plans and focus stays on it', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  expect(await screen.findByText('Read the state management guide')).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+})
+
+test('a failed check from the notice keeps the old result and its notice below the error', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: NOTICE_BUTTON }))
+
+  const alert = await screen.findByRole('alert')
+  expect(alert).toHaveTextContent(GENERIC_ERROR)
+  expect(screen.getByText('83%')).toBeInTheDocument()
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: NOTICE_BUTTON })).toBeInTheDocument()
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+})
+
+test('the notice button is unavailable the same way as the header button, and sends nothing', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  const user = userEvent.setup()
+  renderPanel(RESUME, 'The AI service is not available right now.')
+
+  const button = screen.getByRole('button', { name: NOTICE_BUTTON })
+  await user.click(button)
+
+  expect(button).toHaveAttribute('aria-disabled', 'true')
+  expect(button).not.toHaveAttribute('disabled')
+  expect(button).toHaveAccessibleDescription('The AI service is not available right now.')
+  expect(fetchMock).not.toHaveBeenCalled()
+})
+
+test('the first check still moves focus to Check again once the result appears', async () => {
+  answerWith(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check my fit' }))
+
+  expect(await screen.findByRole('button', { name: 'Check again' })).toHaveFocus()
+})
+
+test('the panel keeps one announcement region of its own and adds only the notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getAllByRole('status')).toHaveLength(2)
+  expect(liveRegion()).toHaveTextContent('')
 })

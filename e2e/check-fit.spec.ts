@@ -216,6 +216,50 @@ test.describe('with the stand-in model', () => {
     const count = await request.get(`${STAND_IN}/__count`)
     expect(await count.json()).toEqual({ generateContent: 2 })
   })
+
+  test('a result saved before learning plans existed offers Check again, and one click adds them @fake-only', async ({
+    page,
+  }) => {
+    let fitRequests = 0
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/fit')) fitRequests += 1
+    })
+    await saveResume(page)
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+    await page.getByRole('button', { name: 'Check my fit' }).click()
+    await expect(page.getByText('Strong fit', { exact: true })).toBeVisible()
+    expect(fitRequests).toBe(1)
+
+    // Make the saved result look like one from before learning plans existed.
+    await page.evaluate(() => {
+      const raw = window.localStorage.getItem('jw:analyses')
+      const stored = JSON.parse(raw ?? 'null') as {
+        state: { byJobId: Record<string, { advice: unknown }> }
+      }
+      const entry = stored.state.byJobId['job-frontend-senior']
+      if (entry) entry.advice = null
+      window.localStorage.setItem('jw:analyses', JSON.stringify(stored))
+    })
+    await page.reload()
+    await page.getByRole('button', { name: 'Senior Frontend Engineer' }).click()
+
+    // The saved result shows at once, with its score and a notice, and sends nothing.
+    const notice = page
+      .getByRole('status')
+      .filter({ hasText: 'Learning plans and tailoring tips are new' })
+    await expect(notice).toBeVisible()
+    await expect(page.getByText('Strong fit', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Show plan:/ })).toHaveCount(0)
+    expect(fitRequests).toBe(1)
+
+    await notice.getByRole('button', { name: 'Check again to add learning plans and tips' }).click()
+
+    await expect(page.getByRole('button', { name: /^Show plan:/ })).toHaveCount(1)
+    await expect(notice).toHaveCount(0)
+    await expect(page.getByText('Strong fit', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Check again', exact: true })).toBeFocused()
+    expect(fitRequests).toBe(2)
+  })
 })
 
 test('a paste that is too short is refused and saves nothing, even after a reload', async ({
