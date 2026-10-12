@@ -1,4 +1,8 @@
-import { FIT_SCHEMA_VERSION, fitResponseSchema } from '@jobs-workspace/shared'
+import {
+  FIT_SCHEMA_VERSION,
+  fitResponseSchema,
+  RATING_QUOTE_MAX_CHARS,
+} from '@jobs-workspace/shared'
 import type { FitResponse, Job, RatedRequirement } from '@jobs-workspace/shared'
 import type { z } from 'zod'
 
@@ -51,7 +55,13 @@ function settle(requirementId: string, rated: ModelRating | undefined, index: Re
   if (rated === undefined) return notEvidenced(requirementId, '', false)
   const rationale = rated.rationale.slice(0, RATIONALE_MAX)
   if (rated.rating === 'not_evidenced') return notEvidenced(requirementId, rationale, false)
-  if (rated.quote === null || !verifyQuote(rated.quote, index)) {
+  // A quote longer than the bound is treated like one that cannot be verified: the prompt asks
+  // for 25 words, and the stored result must not carry large blocks of the resume.
+  if (
+    rated.quote === null ||
+    rated.quote.length > RATING_QUOTE_MAX_CHARS ||
+    !verifyQuote(rated.quote, index)
+  ) {
     return notEvidenced(requirementId, '', true)
   }
   return {

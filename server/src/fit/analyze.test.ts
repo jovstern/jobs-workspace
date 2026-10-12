@@ -1,4 +1,9 @@
-import { FIT_SCHEMA_VERSION, fitResponseSchema, jobSchema } from '@jobs-workspace/shared'
+import {
+  FIT_SCHEMA_VERSION,
+  fitResponseSchema,
+  jobSchema,
+  RATING_QUOTE_MAX_CHARS,
+} from '@jobs-workspace/shared'
 import type { Job } from '@jobs-workspace/shared'
 import { describe, expect, test } from 'vitest'
 
@@ -313,6 +318,38 @@ describe('a quote that cannot be found in the resume', () => {
       rationale: '',
       quoteRejected: true,
     })
+  })
+
+  test('a quote over the length bound is withdrawn even though it occurs in the resume', async () => {
+    const longLine = `Built React applications ${'for many customers across regions '.repeat(25)}`
+    const resume = `${RESUME}\n${longLine}`
+    expect(longLine.length).toBeGreaterThan(RATING_QUOTE_MAX_CHARS)
+    const ratings = goodRatings()
+    ratings[0] = rating('a-r1', 'met', longLine)
+
+    const { response } = await run(ratings, resume)
+
+    expect(byId(response, 'a-r1')).toEqual({
+      requirementId: 'a-r1',
+      rating: 'not_evidenced',
+      quote: null,
+      rationale: '',
+      quoteRejected: true,
+    })
+  })
+
+  test('a quote exactly at the length bound is kept', async () => {
+    // Words only, so the quote is exactly the bound long and does not end in a space.
+    const atBound =
+      'React '.repeat(RATING_QUOTE_MAX_CHARS).slice(0, RATING_QUOTE_MAX_CHARS - 1) + 'x'
+    expect(atBound).toHaveLength(RATING_QUOTE_MAX_CHARS)
+    const resume = `${RESUME}\n${atBound}`
+    const ratings = goodRatings()
+    ratings[0] = rating('a-r1', 'met', atBound)
+
+    const { response } = await run(ratings, resume)
+
+    expect(byId(response, 'a-r1')).toMatchObject({ rating: 'met', quote: atBound })
   })
 
   test('a partial rating with a null quote gives the same result', async () => {

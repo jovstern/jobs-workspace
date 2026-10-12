@@ -15,6 +15,11 @@ export const fitRequestSchema = z.strictObject({
 })
 export type FitRequest = z.infer<typeof fitRequestSchema>
 
+// The longest quote kept on a rating. The prompt asks for 25 words; this is the code-side bound,
+// applied by the server when a rating is settled. It is deliberately not a `.max` on the schema
+// below: that would make results already saved in a browser fail to load.
+export const RATING_QUOTE_MAX_CHARS = 600
+
 export const ratedRequirementSchema = z.object({
   requirementId: z.string().min(1),
   rating: ratingSchema,
