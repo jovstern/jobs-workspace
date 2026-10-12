@@ -84,7 +84,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 - [x] **FIT-03**: User sees an overall fit score and band computed from those ratings, labelled as an estimate
 - [ ] **FIT-04**: User sees their gaps separated into required and nice-to-have, worded as "not evidenced in your resume"
 - [ ] **FIT-05**: User can mark a gap as "I do have this", which updates the result
-- [ ] **FIT-06**: User sees a learning plan for each gap (what to learn, why it matters for this job, rough effort)
+- [x] **FIT-06**: User sees a learning plan for each gap (what to learn, why it matters for this job, rough effort)
 - [ ] **FIT-07**: User sees resume tailoring tips for the job (which existing experience to emphasise, which posting keywords their resume lacks) that never suggest claiming something the resume does not support
 - [x] **FIT-08**: User sees a previous analysis instantly when reopening a job, without another AI call
 - [ ] **FIT-09**: User sees the fit score on the result card of any job they have analysed
@@ -220,7 +220,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | FIT-03 | Phase 1 | Complete |
 | FIT-04 | Phase 01.1 | Pending |
 | FIT-05 | Phase 01.2 | Pending |
-| FIT-06 | Phase 01.1 | Pending |
+| FIT-06 | Phase 01.1 | Complete |
 | FIT-07 | Phase 01.1 | Pending |
 | FIT-08 | Phase 1 | Complete |
 | FIT-09 | Phase 2 | Pending |

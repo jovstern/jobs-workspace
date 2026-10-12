@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
 current_phase: "01.1"
-current_phase_name: Gaps, learning plan, tips and failure handling
+current_phase_name: Gaps, learning plan, tips and failure handling (INSERTED)
 status: executing
-stopped_at: Phase 01.1 UI-SPEC approved
-last_updated: "2026-10-12T05:45:05.752Z"
-last_activity: 2026-10-11
-last_activity_desc: Phase 01 complete, transitioned to Phase 01.1
-state_head: 0dcd3771cc820008297ecb2be7a519e31b59c843
+stopped_at: Completed 01.1-01-PLAN.md
+last_updated: "2026-10-12T06:33:38.063Z"
+last_activity: 2026-10-12
+last_activity_desc: Phase 01.1 execution started
+state_head: 942958d285931c4a31259968ef5faf358e070ae5
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 20
-  completed_plans: 11
+  completed_plans: 12
   percent: 11
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10)
 
 **Core value:** The user can search for jobs and see and update the progress of every application on the same page, without ever losing their search context.
-**Current focus:** Phase 01 — Real AI path, end to end
+**Current focus:** Phase 01.1 — Gaps, learning plan, tips and failure handling (INSERTED)
 
 ## Current Position
 
-Phase: 01.1 (Gaps, learning plan, tips and failure handling) — READY TO EXECUTE
-Plan: Not started
+Phase: 01.1 (Gaps, learning plan, tips and failure handling (INSERTED)) — EXECUTING
+Plan: 2 of 9
 Status: Ready to execute
-Last activity: 2026-10-11 — Phase 01 complete, transitioned to Phase 01.1
+Last activity: 2026-10-12 — Phase 01.1 execution started
 
 Progress: [█░░░░░░░░░] 11%
 
@@ -67,6 +67,7 @@ Progress: [█░░░░░░░░░] 11%
 | Phase 01 P10 | 17 min | 3 tasks | 13 files |
 | Phase 01 P11 | 25 min | 3 tasks | 9 files |
 | Phase 01 P09 | 256 min | 3 tasks | 11 files |
+| Phase 01.1 P01 | unrecorded | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 01]: 01-09: LOW thinking chosen from live measurements (p90 4698 ms, 6/6 required met near-perfect, 0 met poor, 0 flips); MEDIUM p90 16900 ms missed the 15 s target and HIGH failed 3 of 6 calls at 60 s
 - [Phase 01]: 01-09: MODELS.fit output cap 4096 and deadline 30000 ms follow from the stated rule (floors apply) and were not tested directly; the spike ran at 16384 and 60000
 - [Phase 01]: 01-09: failure diagnostics are a closed vocabulary (status number, category, class name from fixed lists) and are surfaced only in the spike; the route and request log are unchanged
+- [Phase 01.1]: Advice is stored as adviceSchema.nullable(); schema version stays 1 so older records remain valid
+- [Phase 01.1]: Strict wire schema for the provider, lenient parse schema for the answer; buildAdvice validates plans and never fails the response
 
 ### Pending Todos
 
@@ -130,6 +133,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-11T17:33:52.580Z
-Stopped at: Phase 01.1 UI-SPEC approved
-Resume file: .planning/phases/01.1-gaps-learning-plan-tips-and-failure-handling/01.1-UI-SPEC.md
+Last session: 2026-10-12T06:33:38.028Z
+Stopped at: Completed 01.1-01-PLAN.md
+Resume file: None
