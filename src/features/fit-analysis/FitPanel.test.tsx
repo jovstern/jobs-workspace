@@ -601,3 +601,35 @@ test('the panel keeps one announcement region of its own and adds only the notic
   expect(screen.getAllByRole('status')).toHaveLength(2)
   expect(liveRegion()).toHaveTextContent('')
 })
+
+const TAILORED_ADVICE: Advice = {
+  plans: R6_ADVICE.plans,
+  tailoring: {
+    emphasise: [{ quote: 'Quote for r1', advice: 'Say it first.' }],
+    keywords: ['Kubernetes'],
+  },
+}
+
+test('a stored result with advice shows the Tailoring section after the Gaps section', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  renderPanel()
+
+  const gaps = screen.getByRole('heading', { level: 3, name: 'Gaps' })
+  const tailoring = screen.getByRole('heading', {
+    level: 3,
+    name: 'Tailoring your resume for this job',
+  })
+  expect(gaps.compareDocumentPosition(tailoring) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByText('Say it first.')).toBeInTheDocument()
+  expect(screen.getByText('Kubernetes')).toBeInTheDocument()
+})
+
+test('a stored result with no advice shows no Tailoring heading', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByRole('heading', { level: 3, name: 'Gaps' })).toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})

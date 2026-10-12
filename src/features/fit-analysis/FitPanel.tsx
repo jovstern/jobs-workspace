@@ -12,6 +12,7 @@ import { GapsSection } from './GapsSection'
 import { RequirementsSection } from './RequirementsSection'
 import { ScoreBlock } from './ScoreBlock'
 import { buildFitView, selectCurrentAnalysis } from './selectors'
+import { TailoringSection } from './TailoringSection'
 
 interface FitPanelProps {
   job: Job
@@ -167,6 +168,11 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
                   )
                 }
               />
+            </div>
+          ) : null}
+          {view.hasAdvice ? (
+            <div className="mt-12">
+              <TailoringSection tailoring={view.tailoring} />
             </div>
           ) : null}
         </>

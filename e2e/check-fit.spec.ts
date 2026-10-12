@@ -169,6 +169,24 @@ test.describe('with the stand-in model', () => {
       .click()
     await expect(niceGaps.getByRole('button', { name: /^Hide plan:/ })).toHaveCount(1)
     await expect(niceGaps.getByText('What to learn')).toHaveCount(1)
+
+    // The same check also brings tailoring tips: each points at a line already in the resume, and
+    // the posting's words the resume lacks are chips under the honesty note.
+    await expect(
+      page.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+    ).toBeVisible()
+    await expect(
+      page.getByText(
+        'These tips only point at text that is already in your resume. Never add something that is not true.',
+      ),
+    ).toBeVisible()
+    const tips = page.getByRole('list', { name: 'Emphasise what you already have' })
+    await expect(tips.getByRole('listitem').first()).toContainText('From your resume:')
+    await expect(page.getByText('Add only if true for you.', { exact: true })).toBeVisible()
+    const chips = page.getByRole('list', {
+      name: 'Words from the posting your resume does not use',
+    })
+    expect(await chips.getByRole('listitem').count()).toBeGreaterThanOrEqual(4)
   })
 
   test('a quote the resume does not contain is shown as not evidenced @fake-only', async ({
