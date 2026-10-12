@@ -217,7 +217,7 @@ describe('the learning plans in the advice', () => {
     expect(response.advice?.plans[0]?.whyItMatters).toBe('first')
   })
 
-  test('a plan that breaks the limits is dropped and the others stay', async () => {
+  test('a plan that breaks a limit is dropped and the others stay; extra steps are cut to four', async () => {
     const { response } = await run(goodRatings(), RESUME, {
       plans: [
         plan('a-r3', { steps: ['a', 'b', 'c', 'd', 'e'] }),
@@ -226,7 +226,8 @@ describe('the learning plans in the advice', () => {
       ],
     })
 
-    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual(['a-r6'])
+    expect(response.advice?.plans.map((entry) => entry.requirementId)).toEqual(['a-r3', 'a-r6'])
+    expect(response.advice?.plans[0]?.steps).toEqual(['a', 'b', 'c', 'd'])
   })
 
   test('plans that are not a list give no plans and leave all six ratings unchanged', async () => {
