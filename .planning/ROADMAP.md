@@ -20,7 +20,7 @@ Every phase ends in something visibly working that a short demo GIF can show. UI
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Real AI path, end to end** - Paste a resume, "Check my fit" with quoted evidence and a code-computed score (completed 2026-10-11)
-- [ ] **Phase 01.1: Gaps, learning plan, tips and failure handling** (INSERTED) - Gaps, a learning plan per gap, tailoring tips, clear AI failure messages, safe handling of corrupted saved data
+- [x] **Phase 01.1: Gaps, learning plan, tips and failure handling** (INSERTED) - Gaps, a learning plan per gap, tailoring tips, clear AI failure messages, safe handling of corrupted saved data (completed 2026-10-12)
 - [ ] **Phase 01.2: Resume upload, review and lifecycle** (INSERTED) - PDF upload, two-step review, "I do have this", replace or delete, stale-result marker
 - [ ] **Phase 2: Workspace, search and design system** - LinkedIn-style three-pane page, full search and filters, design system, fit score on result cards
 - [ ] **Phase 3: Applications core** - Save and mark applied; stage shows on cards, in the detail pane and in the "My applications" rail
@@ -87,7 +87,7 @@ Plans:
   4. User sees progress while an analysis runs, and a distinct, retryable message for a failure, a timeout, a rate limit and an unconfigured AI service
   5. User whose saved data is corrupted or from an older version sees it migrated or set aside with a visible message, and the page still works
 
-**Plans:** 9/9 plans executed
+**Plans:** 9/9 plans complete
 
 Plans:
 **Wave 1**
@@ -237,7 +237,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Real AI path, end to end | 11/11 | Complete    | 2026-10-11 |
-| 01.1. Gaps, learning plan, tips and failure handling | 9/9 | In Progress | - |
+| 01.1. Gaps, learning plan, tips and failure handling | 9/9 | Complete    | 2026-10-12 |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |
 | 3. Applications core | 0/TBD | Not started | - |

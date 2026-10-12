@@ -82,7 +82,7 @@ Requirements for the first usable version. Each maps to exactly one roadmap phas
 - [x] **FIT-01**: User can run "Check my fit" on the open job and get an analysis from a real AI model comparing the job with their resume
 - [x] **FIT-02**: User sees each job requirement rated met, partial or not evidenced, with the supporting quote from their resume for met and partial ratings
 - [x] **FIT-03**: User sees an overall fit score and band computed from those ratings, labelled as an estimate
-- [ ] **FIT-04**: User sees their gaps separated into required and nice-to-have, worded as "not evidenced in your resume"
+- [x] **FIT-04**: User sees their gaps separated into required and nice-to-have, worded as "not evidenced in your resume"
 - [ ] **FIT-05**: User can mark a gap as "I do have this", which updates the result
 - [x] **FIT-06**: User sees a learning plan for each gap (what to learn, why it matters for this job, rough effort)
 - [x] **FIT-07**: User sees resume tailoring tips for the job (which existing experience to emphasise, which posting keywords their resume lacks) that never suggest claiming something the resume does not support
@@ -218,7 +218,7 @@ Which phases cover which requirements. Filled in during roadmap creation.
 | FIT-01 | Phase 1 | Complete |
 | FIT-02 | Phase 1 | Complete |
 | FIT-03 | Phase 1 | Complete |
-| FIT-04 | Phase 01.1 | Pending |
+| FIT-04 | Phase 01.1 | Complete |
 | FIT-05 | Phase 01.2 | Pending |
 | FIT-06 | Phase 01.1 | Complete |
 | FIT-07 | Phase 01.1 | Complete |
