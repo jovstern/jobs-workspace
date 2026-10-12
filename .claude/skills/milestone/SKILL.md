@@ -15,10 +15,31 @@ A milestone (one roadmap phase) runs in **three blocks, each in a fresh session*
 | 2. Build | build, code review | all gates are green |
 | 3. Ship | verify, demo, pull request | the PR is open and green |
 
-Run **one block per invocation**, then stop. Each block ends by telling the user:
-"Run `/clear`, then `/milestone` for the next block." Never continue into the next block in
-the same session: carrying one block's context into the next is what made this workflow
+Run **one block per invocation**, then stop. Each block ends by telling the user exactly
+what to type for the next one (see "Model per block"). Never continue into the next block
+in the same session: carrying one block's context into the next is what made this workflow
 expensive. Everything a later block needs is on disk in `.planning/`.
+
+## Model per block
+
+| Block | Session model | Why |
+|---|---|---|
+| 1. Plan | Opus | the questions and the plan summary are the main session's own work |
+| 2. Build | Sonnet | the main session only dispatches builders and waits |
+| 3. Ship | Opus | verification involves judgment |
+
+Subagents are unaffected: GSD picks their models itself (the planner stays on Opus).
+
+**Before starting a block, check the model you are running as.** If it is not the one in
+the table, do nothing else: tell the user to switch and run `/milestone` again, then stop.
+The switch for this session only is `/model`, pick the model, and press `s` ("this session
+only"); typing `/model sonnet` directly would also change the default for every project.
+
+End-of-block message:
+
+- after block 1: "Run `/clear`, then `/model` → Sonnet → `s`, then `/milestone`."
+- after block 2: "Run `/clear`, then `/model` → Opus → `s`, then `/milestone`."
+- after block 3: the report; the next milestone starts on Opus.
 
 Phase: `$ARGUMENTS`, or if empty the first phase in `.planning/ROADMAP.md` that is not
 complete.
@@ -48,7 +69,9 @@ record: issue number, research decision, plan approval, PR). Then:
 4. Build and review done, no PR → **Block 3**.
 
 Before any block: the working tree must be clean (otherwise stop and show what is
-uncommitted), and you must be on the phase branch. If the branch does not exist yet:
+uncommitted), and you must be on the phase branch. GSD's own runtime files left by an
+interrupted run (`.planning/state.json`, `.planning/*.lock`) do not count as dirty: leave
+them for GSD to resume from. If the branch does not exist yet:
 
 ```bash
 git switch main && git pull --ff-only
