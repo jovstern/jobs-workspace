@@ -5,9 +5,11 @@ import { useId, useRef } from 'react'
 import { Button } from '../../components/Button'
 import { AdviceMissingNotice } from './AdviceMissingNotice'
 import { FitErrorNotice } from './FitErrorNotice'
+import { FitProgress } from './FitProgress'
 import { describeFitError } from './fit-errors'
 import { useFitStore } from './fit-store'
 import { useCheckFit, useIsCheckingFit } from './mutations'
+import { FIT_REASSURANCE } from './progress-lines'
 import { GapsSection } from './GapsSection'
 import { RequirementsSection } from './RequirementsSection'
 import { ScoreBlock } from './ScoreBlock'
@@ -107,24 +109,27 @@ export function FitPanel({ job, resume, unavailableReason }: FitPanelProps) {
         </p>
       ) : null}
 
-      <div role="status" className={isChecking ? 'flex flex-col gap-2' : 'sr-only'}>
-        {isChecking ? (
-          <>
-            <p className="text-base font-semibold text-gray-900">Checking your fit</p>
-            <p className="text-sm text-gray-600">Usually 10 to 20 seconds.</p>
-          </>
-        ) : (
-          completion
-        )}
+      {isChecking ? (
+        <p className="text-base font-semibold text-gray-900">Checking your fit</p>
+      ) : null}
+
+      {/* The only live region of the panel, always mounted. While a check runs it holds just the
+          stage line, so only a change of stage is announced; the heading, the reassurance and the
+          bar stay outside it. */}
+      <div role="status" className={isChecking ? undefined : 'sr-only'}>
+        {isChecking ? <FitProgress /> : completion}
       </div>
 
       {isChecking ? (
-        <Progress.Root
-          aria-label="Checking your fit"
-          className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
-        >
-          <Progress.Indicator className="h-full w-full animate-pulse rounded-full bg-blue-700 motion-reduce:animate-none" />
-        </Progress.Root>
+        <>
+          <p className="text-sm text-gray-600">{FIT_REASSURANCE}</p>
+          <Progress.Root
+            aria-label="Checking your fit"
+            className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+          >
+            <Progress.Indicator className="h-full w-full animate-pulse rounded-full bg-blue-700 motion-reduce:animate-none" />
+          </Progress.Root>
+        </>
       ) : null}
 
       {!isChecking && failure ? <FitErrorNotice error={failure} onRetry={retry} /> : null}
