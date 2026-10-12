@@ -633,3 +633,60 @@ test('a stored result with no advice shows no Tailoring heading', () => {
     screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
   ).not.toBeInTheDocument()
 })
+
+test('while a check runs the Tailoring section is not rendered', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  fetchMock.mockImplementation(() => new Promise<Response>(() => undefined))
+  const user = userEvent.setup()
+  renderPanel()
+  expect(
+    screen.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+  ).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  await screen.findByRole('progressbar', { name: 'Checking your fit' })
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})
+
+test('a failed re-check keeps the previous tips and keywords below the error notice', async () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, TAILORED_ADVICE))
+  fetchMock.mockImplementation(() => Promise.resolve(errorResponse('ai_failed', 502)))
+  const user = userEvent.setup()
+  renderPanel()
+
+  await user.click(screen.getByRole('button', { name: 'Check again' }))
+
+  const alert = await screen.findByRole('alert')
+  const tip = screen.getByText('Say it first.')
+  expect(alert.compareDocumentPosition(tip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(screen.getByRole('list', { name: 'Emphasise what you already have' })).toBeInTheDocument()
+  expect(screen.getByText('Kubernetes')).toBeInTheDocument()
+})
+
+test('an old result shows the old-result notice and no Tailoring section', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL))
+  renderPanel()
+
+  expect(screen.getByText(OLD_RESULT_SENTENCE)).toBeInTheDocument()
+  expect(
+    screen.queryByRole('heading', { name: 'Tailoring your resume for this job' }),
+  ).not.toBeInTheDocument()
+})
+
+test('advice with unusable tailoring shows the heading and the unavailable line, no old-result notice', () => {
+  seed(fitResponse(FIVE_MET_ONE_PARTIAL, undefined, {}, R6_ADVICE))
+  renderPanel()
+
+  expect(
+    screen.getByRole('heading', { level: 3, name: 'Tailoring your resume for this job' }),
+  ).toBeInTheDocument()
+  expect(
+    screen.getByText(
+      'Tailoring tips could not be generated for this check. Check again to try once more.',
+    ),
+  ).toBeInTheDocument()
+  expect(screen.queryByText(OLD_RESULT_SENTENCE)).not.toBeInTheDocument()
+})
