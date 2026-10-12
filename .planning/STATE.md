@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: "01.1"
 current_phase_name: Gaps, learning plan, tips and failure handling (INSERTED)
 status: executing
-stopped_at: Completed 01.1-08-PLAN.md
-last_updated: "2026-10-12T11:35:30.417Z"
+stopped_at: Completed 01.1-07-PLAN.md (decline; live checks open)
+last_updated: "2026-10-12T12:20:24.566Z"
 last_activity: 2026-10-12
 last_activity_desc: Phase 01.1 execution started
-state_head: c6e6282d773ec411833cf4615f4615cc64f43446
+state_head: c41111d00e47073ad72f5f9834569e3d09a9420b
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
   percent: 11
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-10)
 ## Current Position
 
 Phase: 01.1 (Gaps, learning plan, tips and failure handling (INSERTED)) — EXECUTING
-Plan: 5 of 9
+Plan: 9 of 9 (live checks of plan 01.1-07 declined by the user; schema acceptance and latency open and unverified)
 Status: Ready to execute
 Last activity: 2026-10-12 — Phase 01.1 execution started
 
@@ -75,6 +75,7 @@ Progress: [█░░░░░░░░░] 11%
 | Phase 01.1 P05 | 11 min | 3 tasks | 8 files |
 | Phase 01.1 P06 | 10 min | 2 tasks | 6 files |
 | Phase 01.1 P08 | n/a | 3 tasks | 11 files |
+| Phase 01.1 P07 | short | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,7 @@ Recent decisions affecting current work:
 - [Phase 01.1]: Plan 05: stand-in scenarios ship in each task's RED commit (test support the pre-commit typecheck needs); SCENARIOS is exported so the route test fails if a scenario is left unclassified
 - [Phase 01.1]: Plan 06: the whole TailoringSection, with every empty and unavailable state, was built in the tracer task; the second task added the state tests (checked by mutation) because the states share the same JSX
 - [Phase 01.1]: Plan 01.1-08: browser-only codes server_unreachable and request_timeout are a two-entry table in fit-errors.ts; the retry flag is always the envelope's, never derived from the code
+- [Phase 01.1]: 01.1-07: user declined every paid call; 0 requests sent; schema acceptance (A4) and latency and size (A2, A3) stay open and unverified; defaults stand
 
 ### Pending Todos
 
@@ -148,6 +150,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-12T11:35:30.379Z
-Stopped at: Completed 01.1-08-PLAN.md
+Last session: 2026-10-12T12:20:24.530Z
+Stopped at: Completed 01.1-07-PLAN.md (decline; live checks open)
 Resume file: None

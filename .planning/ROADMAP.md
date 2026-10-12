@@ -87,7 +87,7 @@ Plans:
   4. User sees progress while an analysis runs, and a distinct, retryable message for a failure, a timeout, a rate limit and an unconfigured AI service
   5. User whose saved data is corrupted or from an older version sees it migrated or set aside with a visible message, and the page still works
 
-**Plans:** 8/9 plans executed
+**Plans:** 9/9 plans executed
 
 Plans:
 **Wave 1**
@@ -107,7 +107,7 @@ Plans:
 - [x] 01.1-08-PLAN.md — Failure messages and progress in the browser: per-code sentences, Try again only when it helps, staged progress, the demo flow test
 
 **Wave 5** *(blocked on Wave 4 completion)*
-- [ ] 01.1-07-PLAN.md — Optional live checks against the real model (paid, user decides at that moment, not a gate): one smoke call, short latency measurement
+- [x] 01.1-07-PLAN.md — Optional live checks against the real model (paid, user decides at that moment, not a gate): one smoke call, short latency measurement. User declined every paid call: live verification open and unverified (see 01.1-SPIKE-RESULTS.md)
 
 **UI hint**: yes
 
@@ -237,7 +237,7 @@ Phases execute in numeric order: 1 → 1.1 → 1.2 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Real AI path, end to end | 11/11 | Complete    | 2026-10-11 |
-| 01.1. Gaps, learning plan, tips and failure handling | 8/9 | In Progress | - |
+| 01.1. Gaps, learning plan, tips and failure handling | 9/9 | In Progress | - |
 | 01.2. Resume upload, review and lifecycle | 0/TBD | Not started | - |
 | 2. Workspace, search and design system | 0/TBD | Not started | - |
 | 3. Applications core | 0/TBD | Not started | - |
