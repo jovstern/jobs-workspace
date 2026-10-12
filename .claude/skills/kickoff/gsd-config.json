@@ -17,18 +17,36 @@
     "verifier": true,
     "code_review": true,
     "ui_phase": true,
-    "auto_advance": false
+    "auto_advance": false,
+    "compact_content": true,
+    "nyquist_validation": false
   },
   "hooks": {
     "workflow_guard": true
   },
   "agent_skills": {
-    "gsd-planner": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
-    "gsd-plan-checker": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
-    "gsd-executor": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
-    "gsd-code-reviewer": [".claude/skills/stack-conventions"],
-    "gsd-code-fixer": [".claude/skills/stack-conventions", ".claude/skills/quality-gates"],
-    "gsd-verifier": [".claude/skills/quality-gates"]
+    "gsd-planner": [
+      ".claude/skills/stack-conventions",
+      ".claude/skills/quality-gates"
+    ],
+    "gsd-plan-checker": [
+      ".claude/skills/stack-conventions",
+      ".claude/skills/quality-gates"
+    ],
+    "gsd-executor": [
+      ".claude/skills/stack-conventions",
+      ".claude/skills/quality-gates"
+    ],
+    "gsd-code-reviewer": [
+      ".claude/skills/stack-conventions"
+    ],
+    "gsd-code-fixer": [
+      ".claude/skills/stack-conventions",
+      ".claude/skills/quality-gates"
+    ],
+    "gsd-verifier": [
+      ".claude/skills/quality-gates"
+    ]
   },
   "ship": {
     "pr_body_sections": [
