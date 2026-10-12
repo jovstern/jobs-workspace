@@ -26,6 +26,32 @@ describe('diagnoseError', () => {
     expect(diagnoseError(error)).toMatchObject({ httpStatus: 400, category: 'FAILED_PRECONDITION' })
   })
 
+  test('a 400 that names API_KEY_INVALID is reported as a refused key', () => {
+    const error = apiError(
+      400,
+      '{"error":{"code":400,"status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}',
+    )
+    expect(diagnoseError(error)).toMatchObject({ httpStatus: 400, category: 'UNAUTHENTICATED' })
+  })
+
+  test('a 400 that names both tokens is a billing problem, and one that names neither is not', () => {
+    const both = apiError(400, 'FAILED_PRECONDITION and API_KEY_INVALID')
+    expect(diagnoseError(both)).toMatchObject({ httpStatus: 400, category: 'FAILED_PRECONDITION' })
+    const neither = apiError(400, 'Request contains an invalid argument.')
+    expect(diagnoseError(neither)).toMatchObject({ httpStatus: 400, category: 'INVALID_ARGUMENT' })
+  })
+
+  test('the token is only searched for: a 403 or a non-HTTP failure that names it is not changed', () => {
+    expect(diagnoseError(apiError(403, 'API_KEY_INVALID'))).toMatchObject({
+      httpStatus: 403,
+      category: 'PERMISSION_DENIED',
+    })
+    expect(diagnoseError(new Error('API_KEY_INVALID'))).toMatchObject({
+      httpStatus: null,
+      category: 'unknown',
+    })
+  })
+
   test('an unmapped HTTP status keeps the number and a generic category', () => {
     expect(diagnoseError(apiError(418, 'x'))).toMatchObject({
       httpStatus: 418,
@@ -60,6 +86,7 @@ describe('diagnoseError', () => {
       'AIzaSyFAKE-KEY-0123456789',
       'You are a careful recruiter. Rate each requirement.',
       '{"error":{"code":400,"message":"Request contains an invalid argument.","status":"INVALID_ARGUMENT"}}',
+      'API_KEY_INVALID AIzaSyFAKE-KEY-0123456789 Built React apps for Northwind Labs over nine years.',
     ]
     for (const secret of secrets) {
       const errors = [

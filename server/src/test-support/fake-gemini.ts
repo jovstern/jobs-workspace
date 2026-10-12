@@ -15,6 +15,10 @@ export type Scenario =
   | 'ok'
   | 'http_429'
   | 'http_503'
+  | 'http_403'
+  | 'http_402'
+  | 'http_400_billing'
+  | 'http_400_key'
   | 'blocked'
   | 'truncated'
   | 'garbage'
@@ -28,10 +32,14 @@ export type Scenario =
   | 'advice_malformed'
   | 'advice_partial'
 
-const SCENARIOS: readonly Scenario[] = [
+export const SCENARIOS: readonly Scenario[] = [
   'ok',
   'http_429',
   'http_503',
+  'http_403',
+  'http_402',
+  'http_400_billing',
+  'http_400_key',
   'blocked',
   'truncated',
   'garbage',
@@ -501,6 +509,50 @@ export async function startFakeGemini(
       case 'http_503':
         sendJson(response, 503, {
           error: { code: 503, message: 'The model is overloaded.', status: 'UNAVAILABLE' },
+        })
+        return
+      // Each carries Google's own wording, so tests can prove that wording never reaches a response.
+      case 'http_403':
+        sendJson(response, 403, {
+          error: {
+            code: 403,
+            message: 'Permission denied for this key.',
+            status: 'PERMISSION_DENIED',
+          },
+        })
+        return
+      case 'http_402':
+        sendJson(response, 402, {
+          error: {
+            code: 402,
+            message: 'Prepaid credits are depleted.',
+            status: 'PAYMENT_REQUIRED',
+          },
+        })
+        return
+      case 'http_400_billing':
+        sendJson(response, 400, {
+          error: {
+            code: 400,
+            message: 'Billing is not enabled for this project.',
+            status: 'FAILED_PRECONDITION',
+          },
+        })
+        return
+      case 'http_400_key':
+        sendJson(response, 400, {
+          error: {
+            code: 400,
+            message: 'API key not valid. Please pass a valid API key.',
+            status: 'INVALID_ARGUMENT',
+            details: [
+              {
+                '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                reason: 'API_KEY_INVALID',
+                domain: 'googleapis.com',
+              },
+            ],
+          },
         })
         return
       case 'blocked':

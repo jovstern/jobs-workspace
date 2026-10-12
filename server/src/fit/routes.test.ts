@@ -9,7 +9,7 @@ import { createApp } from '../app'
 import { createGeminiClient } from '../ai/client'
 import type { AiClient } from '../ai/client'
 import { getJob } from '../jobs/seed'
-import { startFakeGemini } from '../test-support/fake-gemini'
+import { SCENARIOS, startFakeGemini } from '../test-support/fake-gemini'
 import type { FakeGemini } from '../test-support/fake-gemini'
 
 const API_KEY = 'ci-fake-key'
@@ -210,20 +210,54 @@ describe('requests that must never reach the model', () => {
   })
 })
 
+// The one table of every failing stand-in scenario: the code, status and retry flag it must leave
+// the route with.
+const FAILURE_TABLE = [
+  ['http_429', 429, 'ai_rate_limited', true],
+  ['http_503', 502, 'ai_overloaded', true],
+  ['http_403', 502, 'ai_auth_failed', false],
+  ['http_402', 502, 'ai_billing', false],
+  ['http_400_billing', 502, 'ai_billing', false],
+  ['http_400_key', 502, 'ai_auth_failed', false],
+  ['blocked', 422, 'ai_blocked', false],
+  ['finish_safety', 422, 'ai_blocked', false],
+  ['truncated', 502, 'ai_truncated', true],
+  ['garbage', 502, 'ai_invalid_output', true],
+  ['empty', 502, 'ai_invalid_output', true],
+  ['no_candidate', 502, 'ai_invalid_output', true],
+  ['empty_ratings', 502, 'ai_invalid_output', true],
+  ['finish_unexpected', 502, 'ai_failed', true],
+] as const
+
+const NON_FAILING_SCENARIOS = [
+  'ok',
+  'slow',
+  'hallucinated_quote',
+  'advice_malformed',
+  'advice_partial',
+] as const
+
+// Words the provider, the prompt or the resume carry, and that must never reach an error body.
+const FORBIDDEN_IN_BODIES = [
+  'Quota exceeded',
+  'The model is overloaded',
+  'PROHIBITED_CONTENT',
+  'Permission denied for this key',
+  'API key not valid',
+  'Billing is not enabled',
+  'Prepaid credits',
+  'TASK: fit-ratings',
+  'Built React single page applications',
+  'logistics start-up',
+]
+
 describe('model and upstream failures', () => {
-  // The code, status and retry flag each failing stand-in scenario must leave the route with.
-  test.each([
-    ['http_429', 429, 'ai_rate_limited', true],
-    ['http_503', 502, 'ai_overloaded', true],
-    ['blocked', 422, 'ai_blocked', false],
-    ['truncated', 502, 'ai_truncated', true],
-    ['garbage', 502, 'ai_invalid_output', true],
-    ['finish_safety', 422, 'ai_blocked', false],
-    ['finish_unexpected', 502, 'ai_failed', true],
-    ['empty', 502, 'ai_invalid_output', true],
-    ['no_candidate', 502, 'ai_invalid_output', true],
-    ['empty_ratings', 502, 'ai_invalid_output', true],
-  ] as const)(
+  test('every stand-in scenario is either in the failure table or known to succeed', () => {
+    const listed: string[] = [...FAILURE_TABLE.map(([name]) => name), ...NON_FAILING_SCENARIOS]
+    expect([...SCENARIOS].sort()).toEqual([...listed].sort())
+  })
+
+  test.each(FAILURE_TABLE)(
     '%s answers %i %s after exactly one upstream request',
     async (scenario, expectedStatus, expectedCode, expectedRetryable) => {
       fake.setScenario(scenario)
@@ -254,17 +288,62 @@ describe('model and upstream failures', () => {
     })
   })
 
-  test("no error body holds the provider's own wording", async () => {
-    for (const scenario of ['http_429', 'http_503', 'blocked', 'truncated', 'garbage'] as const) {
+  test("no error body holds the provider's own wording, the prompt or the resume", async () => {
+    for (const [scenario] of FAILURE_TABLE) {
+      fake.reset()
       fake.setScenario(scenario)
       const { text } = await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })
-      for (const providerText of [
-        'Quota exceeded',
-        'The model is overloaded',
-        'PROHIBITED_CONTENT',
-      ]) {
-        expect(text).not.toContain(providerText)
+      for (const forbidden of FORBIDDEN_IN_BODIES) {
+        expect(text, `${scenario} body`).not.toContain(forbidden)
       }
+    }
+  })
+
+  test("Google's rate limit is never this app's own limit: no Retry-After, and a different sentence", async () => {
+    fake.setScenario('http_429')
+
+    const response = await fetch(`${baseUrl}/api/fit`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobId: JOB_ID, resumeText: RESUME_A }),
+    })
+    const body = apiErrorSchema.parse(await response.json())
+
+    expect(response.status).toBe(429)
+    expect(response.headers.get('retry-after')).toBeNull()
+    expect(body.error.code).toBe('ai_rate_limited')
+    expect(body.error.message).toBe(ERROR_MESSAGES.ai_rate_limited)
+    expect(body.error.message).not.toBe(ERROR_MESSAGES.too_many_requests)
+  })
+
+  test('a stand-in that cannot be reached answers 502 ai_network, retryable, and logs only a category', async () => {
+    const gone = await startFakeGemini()
+    const goneUrl = gone.url
+    await gone.close()
+    const lines: string[] = []
+    const unreachable = await listen(
+      createApp({
+        ai: createGeminiClient({ apiKey: API_KEY, baseUrl: goneUrl }),
+        log: (line) => lines.push(line),
+      }),
+    )
+    try {
+      const { status, text } = await postFit(unreachable.url, {
+        jobId: JOB_ID,
+        resumeText: RESUME_A,
+      })
+
+      expect(status).toBe(502)
+      const body = apiErrorSchema.parse(JSON.parse(text))
+      expect(body.error).toEqual({
+        code: 'ai_network',
+        retryable: true,
+        message: ERROR_MESSAGES.ai_network,
+      })
+      expect(lines).toContain('fit failed status=none category=network')
+      expect(text).not.toContain(goneUrl)
+    } finally {
+      unreachable.server.close()
     }
   })
 
@@ -402,7 +481,8 @@ describe('contact details never reach the model', () => {
 
 test('no response body contains the AI key', async () => {
   const bodies: string[] = []
-  for (const scenario of ['ok', 'http_503', 'blocked', 'garbage'] as const) {
+  for (const scenario of ['ok', ...FAILURE_TABLE.map(([name]) => name)] as const) {
+    fake.reset()
     fake.setScenario(scenario)
     bodies.push((await postFit(baseUrl, { jobId: JOB_ID, resumeText: RESUME_A })).text)
   }
