@@ -69,10 +69,15 @@ function httpStatusOf(error: unknown): number | null {
   return status >= 100 && status <= 599 ? status : null
 }
 
-// The error text is searched for one fixed token and nothing else is read from it. It is never
+// The error text is searched for fixed tokens and nothing else is read from it. It is never
 // copied, so a message that echoes a prompt or a resume cannot reach a diagnostic.
 function messageNamesFailedPrecondition(error: unknown): boolean {
   return error instanceof Error && error.message.includes('FAILED_PRECONDITION')
+}
+
+// The second fixed token: Google answers a key it does not know with a 400, not a 401 or 403.
+function messageNamesInvalidKey(error: unknown): boolean {
+  return error instanceof Error && error.message.includes('API_KEY_INVALID')
 }
 
 function errorClassOf(error: unknown): ErrorClassName | null {
@@ -88,6 +93,9 @@ export function diagnoseError(error: unknown): AiFailureDiagnostic {
   if (httpStatus !== null) {
     if (httpStatus === 400 && messageNamesFailedPrecondition(error)) {
       return { httpStatus, category: 'FAILED_PRECONDITION', errorClass }
+    }
+    if (httpStatus === 400 && messageNamesInvalidKey(error)) {
+      return { httpStatus, category: 'UNAUTHENTICATED', errorClass }
     }
     return { httpStatus, category: CATEGORY_BY_HTTP_STATUS[httpStatus] ?? 'unknown', errorClass }
   }
